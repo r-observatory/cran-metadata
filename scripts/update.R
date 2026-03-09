@@ -86,7 +86,7 @@ tryCatch({
   )")
   dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)")
 
-  # Rename columns to match schema
+  # Rename columns to match schema; filter out rows with NA in required fields
   write_df <- data.frame(
     package  = results_df$Package,
     flavor   = results_df$Flavor,
@@ -96,6 +96,9 @@ tryCatch({
     ttotal   = as.numeric(results_df$T_total),
     stringsAsFactors = FALSE
   )
+  # Remove rows where required NOT NULL columns are NA
+  write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$flavor) & !is.na(write_df$status), ]
+  cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
   dbBegin(con)
   dbWriteTable(con, "cran_check_results", write_df, append = TRUE)
@@ -153,15 +156,19 @@ tryCatch({
 cat("\n=== 3. Check Status History ===\n")
 tryCatch({
   if (!is.null(results_df) && is.data.frame(results_df) && nrow(results_df) > 0) {
+    # Filter out rows with NA in Package or Status for history computation
+    results_clean <- results_df[!is.na(results_df$Package) & !is.na(results_df$Status), ]
+    cat("  Using", nrow(results_clean), "clean check result rows for history\n")
+
     status_levels <- c("OK" = 0L, "NOTE" = 1L, "WARNING" = 2L, "ERROR" = 3L)
 
-    pkg_list <- unique(results_df$Package)
+    pkg_list <- unique(results_clean$Package)
     n_pkgs <- length(pkg_list)
 
     # Vectorised worst-status computation using split
-    pkg_factor <- factor(results_df$Package, levels = pkg_list)
-    severity_vec <- ifelse(results_df$Status %in% names(status_levels),
-                           status_levels[results_df$Status], -1L)
+    pkg_factor <- factor(results_clean$Package, levels = pkg_list)
+    severity_vec <- ifelse(results_clean$Status %in% names(status_levels),
+                           status_levels[results_clean$Status], -1L)
 
     # Worst severity per package
     worst_sev <- tapply(severity_vec, pkg_factor, max)
@@ -170,7 +177,7 @@ tryCatch({
 
     # Flavor summary: count of each status per package as JSON
     flavor_summary <- character(n_pkgs)
-    status_split <- split(results_df$Status, pkg_factor)
+    status_split <- split(results_clean$Status, pkg_factor)
     for (i in seq_along(pkg_list)) {
       tbl <- table(status_split[[i]])
       pairs <- paste0('"', names(tbl), '":', as.integer(tbl))
@@ -181,7 +188,7 @@ tryCatch({
     details_json <- character(n_pkgs)
     for (i in seq_along(pkg_list)) {
       pkg <- pkg_list[i]
-      pkg_rows <- results_df[results_df$Package == pkg, , drop = FALSE]
+      pkg_rows <- results_clean[results_clean$Package == pkg, , drop = FALSE]
       non_ok <- pkg_rows[pkg_rows$Status != "OK", , drop = FALSE]
 
       if (nrow(non_ok) == 0) {
@@ -299,13 +306,25 @@ tryCatch({
   )")
   dbExecute(con, "CREATE INDEX idx_cci_package ON cran_check_issues (package)")
 
+  # Debug: print column names to help diagnose field mapping
+  cat("  Check issues columns:", paste(names(issues), collapse = ", "), "\n")
+
+  # Map columns safely — names may vary across R versions
+  safe_issues_col <- function(df, candidates) {
+    for (col in candidates) {
+      if (col %in% names(df)) return(as.character(df[[col]]))
+    }
+    rep(NA_character_, nrow(df))
+  }
+
   write_df <- data.frame(
-    package = issues$Package,
-    version = if ("Version" %in% names(issues)) issues$Version else NA_character_,
-    kind    = issues$Kind,
-    href    = if ("href" %in% names(issues)) issues$href else NA_character_,
+    package = safe_issues_col(issues, c("Package", "package")),
+    version = safe_issues_col(issues, c("Version", "version")),
+    kind    = safe_issues_col(issues, c("Kind", "kind")),
+    href    = safe_issues_col(issues, c("href", "Href", "URL", "url")),
     stringsAsFactors = FALSE
   )
+  write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$kind), ]
 
   dbBegin(con)
   dbWriteTable(con, "cran_check_issues", write_df, append = TRUE)
@@ -341,39 +360,40 @@ tryCatch({
   dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)")
   dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
 
+  # Debug: print column names
+  cat("  Authors columns:", paste(names(authors_df), collapse = ", "), "\n")
+
   # Build write data — handle columns that may not exist
-  safe_col <- function(df, col) {
-    if (col %in% names(df)) as.character(df[[col]]) else NA_character_
-  }
-
-  # The role column might be a list; collapse to comma-separated string
-  role_col <- safe_col(authors_df, "role")
-  if (is.list(authors_df$role)) {
-    role_col <- vapply(authors_df$role, function(r) {
-      if (is.null(r) || all(is.na(r))) NA_character_
-      else paste(r, collapse = ", ")
-    }, character(1))
-  }
-
-  # Email might also be a list
-  email_col <- safe_col(authors_df, "email")
-  if ("email" %in% names(authors_df) && is.list(authors_df$email)) {
-    email_col <- vapply(authors_df$email, function(e) {
-      if (is.null(e) || all(is.na(e))) NA_character_
-      else paste(e, collapse = ", ")
-    }, character(1))
+  safe_col <- function(df, candidates) {
+    for (col in candidates) {
+      if (col %in% names(df)) {
+        vals <- df[[col]]
+        # Handle list columns (common in person objects)
+        if (is.list(vals)) {
+          return(vapply(vals, function(v) {
+            if (is.null(v) || all(is.na(v))) NA_character_
+            else paste(as.character(v), collapse = ", ")
+          }, character(1)))
+        }
+        return(as.character(vals))
+      }
+    }
+    rep(NA_character_, nrow(df))
   }
 
   write_df <- data.frame(
-    package = safe_col(authors_df, "Package"),
-    given   = safe_col(authors_df, "given"),
-    family  = safe_col(authors_df, "family"),
-    email   = email_col,
-    role    = role_col,
-    orcid   = safe_col(authors_df, "ORCID"),
-    ror_id  = safe_col(authors_df, "ROR_ID"),
+    package = safe_col(authors_df, c("Package", "package")),
+    given   = safe_col(authors_df, c("given", "Given")),
+    family  = safe_col(authors_df, c("family", "Family")),
+    email   = safe_col(authors_df, c("email", "Email")),
+    role    = safe_col(authors_df, c("role", "Role")),
+    orcid   = safe_col(authors_df, c("ORCID", "orcid")),
+    ror_id  = safe_col(authors_df, c("ROR_ID", "ror_id", "ROR")),
     stringsAsFactors = FALSE
   )
+  # Filter out rows where package is NA
+  write_df <- write_df[!is.na(write_df$package), ]
+  cat("  After filtering:", nrow(write_df), "rows\n")
 
   dbBegin(con)
   dbWriteTable(con, "authors", write_df, append = TRUE)
