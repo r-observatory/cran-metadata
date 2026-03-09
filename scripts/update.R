@@ -32,6 +32,7 @@ json_escape <- function(s) {
   s <- gsub("\n", "\\\\n", s)
   s <- gsub("\t", "\\\\t", s)
   s <- gsub("\r", "\\\\r", s)
+  s <- gsub("[\x00-\x08\x0b\x0c\x0e-\x1f]", "", s, perl = TRUE)
   s
 }
 
@@ -139,6 +140,8 @@ tryCatch({
     output     = if ("Output" %in% names(check_details_df)) check_details_df$Output else NA_character_,
     stringsAsFactors = FALSE
   )
+  write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$check_name) & !is.na(write_df$status), ]
+  cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
   dbBegin(con)
   dbWriteTable(con, "cran_check_details", write_df, append = TRUE)
@@ -172,6 +175,7 @@ tryCatch({
 
     # Worst severity per package
     worst_sev <- tapply(severity_vec, pkg_factor, max)
+    worst_sev <- pmax(worst_sev, 0L)
     sev_to_status <- c("OK", "NOTE", "WARNING", "ERROR")
     worst_status <- sev_to_status[worst_sev + 1L]
 
@@ -184,11 +188,19 @@ tryCatch({
       flavor_summary[i] <- paste0("{", paste(pairs, collapse = ","), "}")
     }
 
+    # Pre-split data frames for O(N+M) lookup instead of O(N*M) subsetting
+    results_by_pkg <- split(results_clean, results_clean$Package)
+    if (!is.null(check_details_df) && nrow(check_details_df) > 0) {
+      details_by_pkg <- split(check_details_df, check_details_df$Package)
+    } else {
+      details_by_pkg <- list()
+    }
+
     # Details: JSON array of non-OK entries enriched from check_details
     details_json <- character(n_pkgs)
     for (i in seq_along(pkg_list)) {
       pkg <- pkg_list[i]
-      pkg_rows <- results_clean[results_clean$Package == pkg, , drop = FALSE]
+      pkg_rows <- results_by_pkg[[pkg]]
       non_ok <- pkg_rows[pkg_rows$Status != "OK", , drop = FALSE]
 
       if (nrow(non_ok) == 0) {
@@ -201,11 +213,9 @@ tryCatch({
         stat <- non_ok$Status[j]
         chk <- ""
         out <- ""
-        if (!is.null(check_details_df) && nrow(check_details_df) > 0) {
-          match_rows <- check_details_df[
-            check_details_df$Package == pkg & check_details_df$Flavor == flav, ,
-            drop = FALSE
-          ]
+        pkg_details <- details_by_pkg[[pkg]]
+        if (!is.null(pkg_details) && nrow(pkg_details) > 0) {
+          match_rows <- pkg_details[pkg_details$Flavor == flav, , drop = FALSE]
           if (nrow(match_rows) > 0) {
             if ("Check" %in% names(match_rows)) chk <- as.character(match_rows$Check[1])
             if ("Output" %in% names(match_rows)) {
