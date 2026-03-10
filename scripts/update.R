@@ -20,27 +20,68 @@ cat("Database path:", db_path, "\n")
 con <- dbConnect(SQLite(), db_path)
 on.exit(dbDisconnect(con), add = TRUE)
 
-dbExecute(con, "PRAGMA journal_mode=WAL")
-dbExecute(con, "PRAGMA synchronous=NORMAL")
+invisible(dbExecute(con, "PRAGMA journal_mode=WAL"))
+invisible(dbExecute(con, "PRAGMA synchronous=NORMAL"))
 
 # ---------------------------------------------------------------------------
-# NUL byte stripping — SQLite TEXT fields reject \x00 and CRAN check output
-# (especially the Output column from tools::CRAN_check_details()) can contain
-# binary garbage.  Strip NUL bytes from every character vector before insert.
+# Text sanitization — CRAN data can contain NUL bytes, other control
+# characters, and non-UTF-8 encodings that break SQLite or downstream JSON.
+# Uses Perl \\x{00} syntax instead of literal \x00 escapes to avoid
+# embedding actual NUL bytes in the source file (which crashes R's parser).
 # ---------------------------------------------------------------------------
-strip_nul <- function(x) {
-  if (!is.character(x)) return(x)
-  gsub("\x00", "", x, useBytes = TRUE)
-}
-
-# Apply strip_nul to every character column of a data.frame
 sanitize_df <- function(df) {
   for (col in names(df)) {
     if (is.character(df[[col]])) {
-      df[[col]] <- strip_nul(df[[col]])
+      # Strip NUL and other problematic control chars in one pass (keep \n \r \t)
+      df[[col]] <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "",
+                         df[[col]], perl = TRUE)
+      # Force valid UTF-8 (drop unrepresentable bytes)
+      df[[col]] <- iconv(df[[col]], to = "UTF-8", sub = "")
     }
   }
   df
+}
+
+# ---------------------------------------------------------------------------
+# Extract diagnostic signal from CRAN check output, discarding build noise.
+# Returns the error/warning messages without compiler invocation lines,
+# make directory changes, or installation boilerplate.
+# ---------------------------------------------------------------------------
+extract_check_signal <- function(output, max_chars = 2000L) {
+  if (is.na(output) || !nzchar(output)) return(NA_character_)
+
+  lines <- strsplit(output, "\n", fixed = TRUE)[[1L]]
+
+  # Drop compiler invocation lines (gcc/g++/clang/gfortran with flags)
+  noise <- grepl("^\\s*(gcc|g\\+\\+|clang|cc|c\\+\\+|gfortran)\\s+-", lines)
+  # Drop make directory changes
+  noise <- noise | grepl("^make\\[\\d+\\]: (Entering|Leaving) directory", lines)
+  # Drop staged installation / byte-compile / removing temp dir boilerplate
+  noise <- noise | grepl("^\\*\\* (using staged|made |byte-compil)", lines)
+  noise <- noise | grepl("^\\* removing '/", lines)
+  # Drop linker invocation lines
+  noise <- noise | grepl("^\\s*(ld|ar|ranlib|install_name_tool)\\s+", lines)
+
+  kept <- lines[!noise]
+  result <- paste(kept, collapse = "\n")
+  result <- trimws(result)
+
+  if (nchar(result) > max_chars) {
+    # Keep first + last portions: beginning has context, end has the error
+    half <- max_chars %/% 2L
+    result <- paste0(
+      substr(result, 1L, half),
+      "\n...[truncated]...\n",
+      substring(result, nchar(result) - half + 1L)
+    )
+  }
+  result
+}
+
+# Vectorized wrapper for extract_check_signal
+extract_check_signal_vec <- function(outputs, max_chars = 2000L) {
+  vapply(outputs, extract_check_signal, character(1L),
+         max_chars = max_chars, USE.NAMES = FALSE)
 }
 
 # ---------------------------------------------------------------------------
@@ -52,14 +93,14 @@ json_escape <- function(s) {
   s <- gsub("\n", "\\\\n", s)
   s <- gsub("\t", "\\\\t", s)
   s <- gsub("\r", "\\\\r", s)
-  s <- gsub("[\x00-\x08\x0b\x0c\x0e-\x1f]", "", s, perl = TRUE)
+  s <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "", s, perl = TRUE)
   s
 }
 
 # ---------------------------------------------------------------------------
 # Create append-only table (never dropped)
 # ---------------------------------------------------------------------------
-dbExecute(con, "
+invisible(dbExecute(con, "
 CREATE TABLE IF NOT EXISTS check_status_history (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   package         TEXT NOT NULL,
@@ -67,9 +108,9 @@ CREATE TABLE IF NOT EXISTS check_status_history (
   flavor_summary  TEXT,
   details         TEXT,
   detected_at     TEXT NOT NULL
-)")
-dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_package  ON check_status_history (package)")
-dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_detected ON check_status_history (detected_at)")
+)"))
+invisible(dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_package  ON check_status_history (package)"))
+invisible(dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_detected ON check_status_history (detected_at)"))
 
 # ---------------------------------------------------------------------------
 # Tracking variables for release notes
@@ -94,8 +135,8 @@ tryCatch({
   results_df <- tools::CRAN_check_results()
   cat("  Fetched", nrow(results_df), "rows\n")
 
-  dbExecute(con, "DROP TABLE IF EXISTS cran_check_results")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS cran_check_results"))
+  invisible(dbExecute(con, "
   CREATE TABLE cran_check_results (
     package  TEXT NOT NULL,
     flavor   TEXT NOT NULL,
@@ -104,10 +145,9 @@ tryCatch({
     tcheck   REAL,
     ttotal   REAL,
     PRIMARY KEY (package, flavor)
-  )")
-  dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)")
+  )"))
+  invisible(dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)"))
 
-  # Rename columns to match schema; filter out rows with NA in required fields
   write_df <- data.frame(
     package  = results_df$Package,
     flavor   = results_df$Flavor,
@@ -117,7 +157,6 @@ tryCatch({
     ttotal   = as.numeric(results_df$T_total),
     stringsAsFactors = FALSE
   )
-  # Remove rows where required NOT NULL columns are NA
   write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$flavor) & !is.na(write_df$status), ]
   cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
@@ -133,7 +172,7 @@ tryCatch({
 })
 
 # =========================================================================
-# 2. Check Details
+# 2. Check Details (non-OK only, with signal extraction)
 # =========================================================================
 cat("\n=== 2. CRAN Check Details ===\n")
 check_details_df <- NULL
@@ -141,8 +180,13 @@ tryCatch({
   check_details_df <- as.data.frame(tools::CRAN_check_details())
   cat("  Fetched", nrow(check_details_df), "rows\n")
 
-  dbExecute(con, "DROP TABLE IF EXISTS cran_check_details")
-  dbExecute(con, "
+  # Only store non-OK results — OK rows carry no diagnostic value
+  check_details_df <- check_details_df[
+    !is.na(check_details_df$Status) & check_details_df$Status != "OK", ]
+  cat("  Non-OK rows:", nrow(check_details_df), "\n")
+
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS cran_check_details"))
+  invisible(dbExecute(con, "
   CREATE TABLE cran_check_details (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     package    TEXT NOT NULL,
@@ -150,15 +194,17 @@ tryCatch({
     check_name TEXT NOT NULL,
     status     TEXT NOT NULL,
     output     TEXT
-  )")
-  dbExecute(con, "CREATE INDEX idx_ccd_package ON cran_check_details (package)")
+  )"))
+  invisible(dbExecute(con, "CREATE INDEX idx_ccd_package ON cran_check_details (package)"))
+  invisible(dbExecute(con, "CREATE INDEX idx_ccd_status  ON cran_check_details (status)"))
 
   write_df <- data.frame(
     package    = check_details_df$Package,
     flavor     = check_details_df$Flavor,
     check_name = if ("Check" %in% names(check_details_df)) check_details_df$Check else NA_character_,
     status     = check_details_df$Status,
-    output     = if ("Output" %in% names(check_details_df)) check_details_df$Output else NA_character_,
+    output     = if ("Output" %in% names(check_details_df))
+                   extract_check_signal_vec(check_details_df$Output) else NA_character_,
     stringsAsFactors = FALSE
   )
   write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$check_name) & !is.na(write_df$status), ]
@@ -181,7 +227,6 @@ tryCatch({
 cat("\n=== 3. Check Status History ===\n")
 tryCatch({
   if (!is.null(results_df) && is.data.frame(results_df) && nrow(results_df) > 0) {
-    # Filter out rows with NA in Package or Status for history computation
     results_clean <- results_df[!is.na(results_df$Package) & !is.na(results_df$Status), ]
     cat("  Using", nrow(results_clean), "clean check result rows for history\n")
 
@@ -195,7 +240,6 @@ tryCatch({
     severity_vec <- ifelse(results_clean$Status %in% names(status_levels),
                            status_levels[results_clean$Status], -1L)
 
-    # Worst severity per package
     worst_sev <- tapply(severity_vec, pkg_factor, max)
     worst_sev <- pmax(worst_sev, 0L)
     sev_to_status <- c("OK", "NOTE", "WARNING", "ERROR")
@@ -210,7 +254,7 @@ tryCatch({
       flavor_summary[i] <- paste0("{", paste(pairs, collapse = ","), "}")
     }
 
-    # Pre-split data frames for O(N+M) lookup instead of O(N*M) subsetting
+    # Pre-split for O(N+M) lookup
     results_by_pkg <- split(results_clean, results_clean$Package)
     if (!is.null(check_details_df) && nrow(check_details_df) > 0) {
       details_by_pkg <- split(check_details_df, check_details_df$Package)
@@ -218,7 +262,7 @@ tryCatch({
       details_by_pkg <- list()
     }
 
-    # Details: JSON array of non-OK entries enriched from check_details
+    # Details: JSON array of non-OK entries with extracted signal
     details_json <- character(n_pkgs)
     for (i in seq_along(pkg_list)) {
       pkg <- pkg_list[i]
@@ -242,10 +286,11 @@ tryCatch({
             if ("Check" %in% names(match_rows)) chk <- as.character(match_rows$Check[1])
             if ("Output" %in% names(match_rows)) {
               out_raw <- match_rows$Output[1]
-              if (!is.na(out_raw)) out <- substring(out_raw, 1, 500)
+              if (!is.na(out_raw)) out <- extract_check_signal(out_raw, max_chars = 500L)
             }
           }
         }
+        if (is.na(out)) out <- ""
         sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s"}',
                 json_escape(flav), json_escape(stat),
                 json_escape(chk), json_escape(out))
@@ -266,8 +311,8 @@ tryCatch({
     # Detect changes: new packages or status changed
     changed_mask <- vapply(seq_along(pkg_list), function(i) {
       pkg <- pkg_list[i]
-      if (is.na(prev_map[pkg])) return(TRUE)  # new package
-      prev_map[pkg] != worst_status[i]         # status changed
+      if (is.na(prev_map[pkg])) return(TRUE)
+      prev_map[pkg] != worst_status[i]
     }, logical(1))
 
     changed_idx <- which(changed_mask)
@@ -285,30 +330,12 @@ tryCatch({
       )
 
       changes_df <- sanitize_df(changes_df)
-      # Insert with dedup guard
       dbBegin(con)
-      stmt <- dbSendStatement(con, "
-        INSERT INTO check_status_history (package, status, flavor_summary, details, detected_at)
-        SELECT ?1, ?2, ?3, ?4, ?5
-        WHERE NOT EXISTS (
-          SELECT 1 FROM check_status_history
-          WHERE package = ?1 AND detected_at = ?5 AND status = ?2
-        )
-      ")
-      for (i in seq_len(nrow(changes_df))) {
-        dbBind(stmt, list(
-          changes_df$package[i],
-          changes_df$status[i],
-          changes_df$flavor_summary[i],
-          changes_df$details[i],
-          changes_df$detected_at[i]
-        ))
-      }
-      dbClearResult(stmt)
+      dbWriteTable(con, "check_status_history", changes_df, append = TRUE)
       dbCommit(con)
 
-      counts$history_changes <- length(changed_idx)
-      cat("  Inserted", length(changed_idx), "status changes\n")
+      counts$history_changes <- nrow(changes_df)
+      cat("  Inserted", nrow(changes_df), "status changes\n")
     } else {
       cat("  No status changes detected\n")
     }
@@ -328,19 +355,16 @@ tryCatch({
   issues <- tools::CRAN_check_issues()
   cat("  Fetched", nrow(issues), "rows\n")
 
-  dbExecute(con, "DROP TABLE IF EXISTS cran_check_issues")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS cran_check_issues"))
+  invisible(dbExecute(con, "
   CREATE TABLE cran_check_issues (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     package TEXT NOT NULL,
     version TEXT,
     kind    TEXT NOT NULL,
     href    TEXT
-  )")
-  dbExecute(con, "CREATE INDEX idx_cci_package ON cran_check_issues (package)")
-
-  # Debug: print column names to help diagnose field mapping
-  cat("  Check issues columns:", paste(names(issues), collapse = ", "), "\n")
+  )"))
+  invisible(dbExecute(con, "CREATE INDEX idx_cci_package ON cran_check_issues (package)"))
 
   # Map columns safely — names may vary across R versions
   safe_issues_col <- function(df, candidates) {
@@ -379,8 +403,8 @@ tryCatch({
   authors_df <- as.data.frame(authors_raw)
   cat("  Fetched", nrow(authors_df), "rows\n")
 
-  dbExecute(con, "DROP TABLE IF EXISTS authors")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS authors"))
+  invisible(dbExecute(con, "
   CREATE TABLE authors (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     package TEXT NOT NULL,
@@ -390,19 +414,15 @@ tryCatch({
     role    TEXT,
     orcid   TEXT,
     ror_id  TEXT
-  )")
-  dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)")
-  dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
-
-  # Debug: print column names
-  cat("  Authors columns:", paste(names(authors_df), collapse = ", "), "\n")
+  )"))
+  invisible(dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)"))
+  invisible(dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)"))
 
   # Build write data — handle columns that may not exist
   safe_col <- function(df, candidates) {
     for (col in candidates) {
       if (col %in% names(df)) {
         vals <- df[[col]]
-        # Handle list columns (common in person objects)
         if (is.list(vals)) {
           return(vapply(vals, function(v) {
             if (is.null(v) || all(is.na(v))) NA_character_
@@ -425,7 +445,6 @@ tryCatch({
     ror_id  = safe_col(authors_df, c("ROR_ID", "ror_id", "ROR")),
     stringsAsFactors = FALSE
   )
-  # Filter out rows where package is NA
   write_df <- write_df[!is.na(write_df$package), ]
   cat("  After filtering:", nrow(write_df), "rows\n")
 
@@ -447,17 +466,16 @@ cat("\n=== 6. Package Enrichment ===\n")
 pdb <- NULL
 tryCatch({
   pdb <- tools::CRAN_package_db()
-  # Deduplicate (recommended packages can appear twice)
   pdb <- pdb[!duplicated(pdb$Package), ]
   cat("  Fetched", nrow(pdb), "packages\n")
 
-  dbExecute(con, "DROP TABLE IF EXISTS packages_enrichment")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS packages_enrichment"))
+  invisible(dbExecute(con, "
   CREATE TABLE packages_enrichment (
     name        TEXT PRIMARY KEY,
     url         TEXT,
     bug_reports TEXT
-  )")
+  )"))
 
   write_df <- data.frame(
     name        = pdb$Package,
@@ -482,14 +500,13 @@ tryCatch({
 # =========================================================================
 cat("\n=== 7. Archival Reasons ===\n")
 tryCatch({
-  dbExecute(con, "DROP TABLE IF EXISTS removal_reasons")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS removal_reasons"))
+  invisible(dbExecute(con, "
   CREATE TABLE removal_reasons (
     package TEXT PRIMARY KEY,
     reason  TEXT
-  )")
+  )"))
 
-  # Get packages with ERROR status from check results
   error_pkgs <- character(0)
   if (dbExistsTable(con, "cran_check_results")) {
     error_pkgs <- dbGetQuery(con, "
@@ -498,7 +515,6 @@ tryCatch({
   }
 
   if (length(error_pkgs) > 0) {
-    # Sample up to 50
     sample_pkgs <- head(error_pkgs, 50)
     cat("  Checking", length(sample_pkgs), "packages with ERROR status\n")
 
@@ -555,17 +571,16 @@ tryCatch({
 # =========================================================================
 cat("\n=== 8. Package NEWS ===\n")
 tryCatch({
-  dbExecute(con, "DROP TABLE IF EXISTS package_news")
-  dbExecute(con, "
+  invisible(dbExecute(con, "DROP TABLE IF EXISTS package_news"))
+  invisible(dbExecute(con, "
   CREATE TABLE package_news (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     package   TEXT NOT NULL,
     version   TEXT NOT NULL,
     news_text TEXT
-  )")
-  dbExecute(con, "CREATE INDEX idx_pn_package ON package_news (package)")
+  )"))
+  invisible(dbExecute(con, "CREATE INDEX idx_pn_package ON package_news (package)"))
 
-  # Get a sample of packages (use enrichment data if available)
   sample_pkgs <- character(0)
   if (!is.null(pdb) && nrow(pdb) > 0) {
     all_pkgs <- pdb$Package
@@ -598,7 +613,6 @@ tryCatch({
         if (!is.null(content) && length(content) > 0) {
           full_text <- paste(content, collapse = "\n")
 
-          # Extract version from CRAN package DB if available
           pkg_version <- NA_character_
           if (!is.null(pdb) && pkg %in% pdb$Package) {
             pkg_version <- pdb$Version[pdb$Package == pkg][1]
@@ -606,12 +620,10 @@ tryCatch({
           if (is.na(pkg_version)) pkg_version <- "latest"
 
           # Extract first version section (up to 2000 chars)
-          # Look for headers like "# pkg 1.0.0" or "## Changes in version 1.0.0"
           header_pattern <- "(^|\\n)[#= ]+.*[0-9]+\\.[0-9]+"
           match_pos <- regexpr(header_pattern, full_text)
           if (match_pos > 0) {
             rest <- substring(full_text, match_pos)
-            # Find next version header (skip first character to avoid matching same header)
             next_header <- regexpr("\\n[#= ]+.*[0-9]+\\.[0-9]+", substring(rest, 2))
             if (next_header > 0 && next_header < 2000) {
               section <- substring(rest, 1, next_header)
