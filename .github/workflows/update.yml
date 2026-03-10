@@ -37,32 +37,13 @@ jobs:
 
       - name: Validate downloaded database
         if: hashFiles('metadata.db') != ''
-        continue-on-error: true
         run: |
-          # The previous metadata.db may contain NUL bytes that crash RSQLite.
-          # Preserve only check_status_history (append-only) and start fresh
-          # for all other tables (they are rebuilt from CRAN each run).
-          if sqlite3 metadata.db "SELECT COUNT(*) FROM check_status_history;" > /dev/null 2>&1; then
-            echo "Extracting check_status_history..."
-            sqlite3 metadata.db ".dump check_status_history" | grep -v "^CREATE" > /tmp/csh_data.sql
-            rm metadata.db
-            sqlite3 metadata.db "
-              CREATE TABLE check_status_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                package TEXT NOT NULL,
-                status TEXT NOT NULL,
-                flavor_summary TEXT,
-                details TEXT,
-                detected_at TEXT NOT NULL
-              );
-              CREATE INDEX idx_csh_package ON check_status_history (package);
-              CREATE INDEX idx_csh_detected ON check_status_history (detected_at);
-            "
-            sqlite3 metadata.db < /tmp/csh_data.sql
-            ROWS=$(sqlite3 metadata.db "SELECT COUNT(*) FROM check_status_history;")
-            echo "Preserved $ROWS check_status_history rows in clean DB"
+          # Verify the DB can be opened by R without NUL byte errors.
+          # All tables are rebuilt from CRAN each run, so starting fresh is safe.
+          if Rscript -e 'library(RSQLite); con <- dbConnect(SQLite(), "metadata.db"); dbDisconnect(con); cat("OK\n")' 2>/dev/null; then
+            echo "Database is valid"
           else
-            echo "Could not read DB — starting fresh"
+            echo "Database is corrupted — removing to start fresh"
             rm -f metadata.db
           fi
 
