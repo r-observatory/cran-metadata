@@ -24,6 +24,26 @@ dbExecute(con, "PRAGMA journal_mode=WAL")
 dbExecute(con, "PRAGMA synchronous=NORMAL")
 
 # ---------------------------------------------------------------------------
+# NUL byte stripping — SQLite TEXT fields reject \x00 and CRAN check output
+# (especially the Output column from tools::CRAN_check_details()) can contain
+# binary garbage.  Strip NUL bytes from every character vector before insert.
+# ---------------------------------------------------------------------------
+strip_nul <- function(x) {
+  if (!is.character(x)) return(x)
+  gsub("\x00", "", x, useBytes = TRUE)
+}
+
+# Apply strip_nul to every character column of a data.frame
+sanitize_df <- function(df) {
+  for (col in names(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- strip_nul(df[[col]])
+    }
+  }
+  df
+}
+
+# ---------------------------------------------------------------------------
 # JSON escape helper
 # ---------------------------------------------------------------------------
 json_escape <- function(s) {
@@ -101,6 +121,7 @@ tryCatch({
   write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$flavor) & !is.na(write_df$status), ]
   cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
+  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "cran_check_results", write_df, append = TRUE)
   dbCommit(con)
@@ -143,6 +164,7 @@ tryCatch({
   write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$check_name) & !is.na(write_df$status), ]
   cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
+  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "cran_check_details", write_df, append = TRUE)
   dbCommit(con)
@@ -262,6 +284,7 @@ tryCatch({
         stringsAsFactors = FALSE
       )
 
+      changes_df <- sanitize_df(changes_df)
       # Insert with dedup guard
       dbBegin(con)
       stmt <- dbSendStatement(con, "
@@ -336,6 +359,7 @@ tryCatch({
   )
   write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$kind), ]
 
+  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "cran_check_issues", write_df, append = TRUE)
   dbCommit(con)
@@ -405,6 +429,7 @@ tryCatch({
   write_df <- write_df[!is.na(write_df$package), ]
   cat("  After filtering:", nrow(write_df), "rows\n")
 
+  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "authors", write_df, append = TRUE)
   dbCommit(con)
@@ -441,6 +466,7 @@ tryCatch({
     stringsAsFactors = FALSE
   )
 
+  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "packages_enrichment", write_df, append = TRUE)
   dbCommit(con)
@@ -507,6 +533,7 @@ tryCatch({
         reason  = reason_text,
         stringsAsFactors = FALSE
       )
+      write_df <- sanitize_df(write_df)
       dbBegin(con)
       dbWriteTable(con, "removal_reasons", write_df, append = TRUE)
       dbCommit(con)
@@ -606,6 +633,7 @@ tryCatch({
         news_text = news_text,
         stringsAsFactors = FALSE
       )
+      write_df <- sanitize_df(write_df)
       dbBegin(con)
       dbWriteTable(con, "package_news", write_df, append = TRUE)
       dbCommit(con)
