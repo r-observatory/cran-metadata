@@ -35,6 +35,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release download --pattern "metadata.db"
 
+      - name: Sanitize downloaded database
+        if: hashFiles('metadata.db') != ''
+        continue-on-error: true
+        run: |
+          # Strip NUL bytes from text columns that may have been contaminated
+          # by previous runs. Only check_status_history is append-only and
+          # must be preserved; all other tables are rebuilt from scratch.
+          sqlite3 metadata.db "
+            UPDATE cran_check_details SET output = REPLACE(output, x'00', '') WHERE output LIKE '%' || x'00' || '%';
+            UPDATE cran_check_results SET status = REPLACE(status, x'00', '') WHERE status LIKE '%' || x'00' || '%';
+            UPDATE check_status_history SET details = REPLACE(details, x'00', '') WHERE details LIKE '%' || x'00' || '%';
+            UPDATE check_status_history SET flavor_summary = REPLACE(flavor_summary, x'00', '') WHERE flavor_summary LIKE '%' || x'00' || '%';
+          " || echo "Sanitization failed — will start fresh"
+
       - name: Run update script
         run: Rscript scripts/update.R metadata.db
 
