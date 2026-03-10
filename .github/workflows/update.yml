@@ -38,14 +38,28 @@ jobs:
       - name: Validate downloaded database
         if: hashFiles('metadata.db') != ''
         run: |
-          # Verify the DB can be opened by R without NUL byte errors.
-          # All tables are rebuilt from CRAN each run, so starting fresh is safe.
-          if Rscript -e 'library(RSQLite); con <- dbConnect(SQLite(), "metadata.db"); dbDisconnect(con); cat("OK\n")' 2>/dev/null; then
-            echo "Database is valid"
-          else
-            echo "Database is corrupted — removing to start fresh"
-            rm -f metadata.db
-          fi
+          # Test if update.R can actually open and use this DB.
+          # RSQLite crashes on NUL bytes in TEXT columns. All metadata tables
+          # are rebuilt each run, so starting fresh is safe (one-time loss of
+          # check_status_history is acceptable).
+          Rscript -e '
+            library(RSQLite)
+            con <- dbConnect(SQLite(), "metadata.db")
+            tryCatch({
+              dbExecute(con, "CREATE TABLE IF NOT EXISTS check_status_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                package TEXT NOT NULL, status TEXT NOT NULL,
+                flavor_summary TEXT, details TEXT, detected_at TEXT NOT NULL)")
+              dbGetQuery(con, "SELECT COUNT(*) FROM check_status_history")
+              cat("Database OK\n")
+            }, error = function(e) {
+              cat("Database corrupted:", conditionMessage(e), "\n")
+              dbDisconnect(con)
+              file.remove("metadata.db")
+              cat("Removed — will start fresh\n")
+            })
+            if (file.exists("metadata.db")) dbDisconnect(con)
+          '
 
       - name: Run update script
         run: Rscript scripts/update.R metadata.db
