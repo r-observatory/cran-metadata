@@ -203,3 +203,7 @@ The database is updated daily at 06:00 UTC via GitHub Actions. Each run rebuilds
 ## License
 
 The data is sourced from [CRAN](https://cran.r-project.org/), which is maintained by the R Foundation. This repository provides the pipeline infrastructure and daily snapshots. Please respect CRAN's terms of use.
+
+## Feedback
+
+Found a bug, a wrong number, or a missing package? Report it at [r-observatory/feedback](https://github.com/r-observatory/feedback/issues/new/choose). All feedback about R Observatory, the site, the data, and the pipelines, is tracked in one place.
