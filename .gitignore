@@ -1,4 +1,6 @@
 *.db
+manifest.json
 release_notes.md
 .Rhistory
 .RData
+tests/testthat/Rplots.pdf
