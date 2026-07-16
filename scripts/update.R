@@ -7,6 +7,15 @@ options(timeout = 120)
 library(RSQLite)
 
 # ---------------------------------------------------------------------------
+# Load the integrity/completeness manifest helpers, resolving the path
+# relative to this script so it works from any working directory.
+# ---------------------------------------------------------------------------
+MANIFEST_FILENAME <- "manifest.json"
+.file_arg <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+.script_dir <- if (length(.file_arg)) dirname(normalizePath(.file_arg[1])) else "scripts"
+source(file.path(.script_dir, "helpers.R"))
+
+# ---------------------------------------------------------------------------
 # CLI argument: path to the SQLite database
 # ---------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
@@ -18,7 +27,15 @@ cat("Database path:", db_path, "\n")
 # Connect and configure SQLite
 # ---------------------------------------------------------------------------
 con <- dbConnect(SQLite(), db_path)
-on.exit(dbDisconnect(con), add = TRUE)
+
+# Finalize the write connection exactly once. A clean dbDisconnect triggers
+# SQLite's WAL checkpoint so metadata.db on disk holds every committed byte
+# before the manifest hashes and sizes it. Guarded by dbIsValid so an explicit
+# call in section 10 and the on.exit safety net cannot double-disconnect.
+finalize_db <- function() {
+  if (DBI::dbIsValid(con)) DBI::dbDisconnect(con)
+}
+on.exit(finalize_db(), add = TRUE)
 
 invisible(dbExecute(con, "PRAGMA journal_mode=WAL"))
 invisible(dbExecute(con, "PRAGMA synchronous=NORMAL"))
@@ -698,5 +715,26 @@ notes <- paste0(
 
 writeLines(notes, "release_notes.md")
 cat("Wrote release_notes.md\n")
+
+# =========================================================================
+# 10. Integrity / completeness manifest
+# =========================================================================
+cat("\n=== 10. Manifest ===\n")
+
+# Close the write connection first so the on-disk metadata.db is finalized and
+# any WAL is checkpointed. summary_integrity_core opens its own short-lived
+# read connection for the row counts, then hashes the exact bytes.
+finalize_db()
+
+# complete = FALSE (honest, code-derived): most tables are a full DROP+rebuild
+# each run, but removal_reasons stores only the first 50 ERROR packages
+# (section 7) and package_news only the first 200 packages (section 8), so
+# metadata.db is a partial snapshot by design, not the full universe. complete
+# tracks full-not-partial; freshness is tracked separately via the manifest
+# generated_at timestamp and the db_sha256 fingerprint.
+core <- summary_integrity_core(db_path, complete = FALSE)
+manifest_path <- file.path(dirname(db_path), MANIFEST_FILENAME)
+write_manifest(manifest_path, core)
+cat("Wrote", manifest_path, "\n")
 
 cat("\nDone.\n")
