@@ -100,13 +100,16 @@ write_manifest <- function(path, core,
 #' single-run drop in the open set beyond `drop_frac_max` all signal a bad input
 #' (e.g. CRAN renamed/removed the undocumented Deadline column, or a partial
 #' fetch). In those cases the caller skips the diff and preserves prior rows,
-#' rather than mass-closing every open episode as "met".
+#' rather than mass-closing every open episode as "met". The mass-disappearance
+#' guards only make sense at scale: below `min_prior` open episodes, a snapshot
+#' dropping (even to 0) is ordinary churn, not a broken fetch, so the diff
+#' proceeds.
 deadline_snapshot_healthy <- function(snapshot_n, prior_open_n, has_col,
-                                      drop_frac_max = 0.5) {
+                                      drop_frac_max = 0.5, min_prior = 20L) {
   if (!isTRUE(has_col)) return(FALSE)
-  if (snapshot_n == 0L && prior_open_n > 0L) return(FALSE)
-  if (prior_open_n > 0L &&
-      (prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
+  if (prior_open_n < min_prior) return(TRUE)
+  if (snapshot_n == 0L) return(FALSE)
+  if ((prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
   TRUE
 }
 
@@ -156,4 +159,75 @@ compute_deadline_changes <- function(prior_open, snapshot, current_packages,
   }
 
   list(inserts = ins, updates = upd)
+}
+
+#' Build/refresh the cran_check_deadlines episode table on a connected metadata.db.
+#'
+#' Ensures the schema (persistent, never dropped), reads the prior open episodes
+#' and per-package max episode_seq from the connected (downloaded) DB, diffs
+#' today's tools::CRAN_package_db()$Deadline snapshot, and applies inserts +
+#' updates in one transaction. Skips the diff (preserving prior rows) when the
+#' snapshot fails the no-data floor. `worst_status_map` is the same in-memory
+#' worst-check-status vector update.R computes for check_status_history.
+write_deadlines <- function(con, pdb,
+                            worst_status_map = setNames(character(0), character(0)),
+                            today = as.character(Sys.Date()),
+                            drop_frac_max = 0.5) {
+  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
+    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT, archived_on TEXT,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_check_deadlines_open
+    ON cran_check_deadlines(package) WHERE resolved_on IS NULL")
+  DBI::dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_ccd_open_deadline
+    ON cran_check_deadlines(deadline) WHERE resolved_on IS NULL")
+
+  prior_open <- DBI::dbGetQuery(con,
+    "SELECT package, episode_seq, deadline, last_seen
+       FROM cran_check_deadlines WHERE resolved_on IS NULL")
+  ms <- DBI::dbGetQuery(con,
+    "SELECT package, MAX(episode_seq) AS max_seq FROM cran_check_deadlines GROUP BY package")
+  max_seq_map <- if (nrow(ms)) setNames(ms$max_seq, ms$package) else setNames(integer(0), character(0))
+
+  has_col <- is.data.frame(pdb) && "Deadline" %in% names(pdb)
+  if (has_col) {
+    keep <- !is.na(pdb$Deadline) & nzchar(pdb$Deadline)
+    snapshot <- data.frame(
+      package = pdb$Package[keep],
+      deadline = pdb$Deadline[keep],
+      version = if ("Version" %in% names(pdb)) pdb$Version[keep] else NA_character_,
+      stringsAsFactors = FALSE)
+  } else {
+    snapshot <- data.frame(package=character(0), deadline=character(0),
+                           version=character(0), stringsAsFactors=FALSE)
+  }
+  current_packages <- if (is.data.frame(pdb) && "Package" %in% names(pdb)) pdb$Package else character(0)
+
+  if (!deadline_snapshot_healthy(nrow(snapshot), nrow(prior_open), has_col, drop_frac_max)) {
+    return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
+  }
+
+  ch <- compute_deadline_changes(prior_open, snapshot, current_packages,
+                                 worst_status_map, max_seq_map, today)
+
+  DBI::dbBegin(con)
+  ok <- FALSE
+  on.exit(if (!ok) tryCatch(DBI::dbRollback(con), error = function(e) NULL), add = TRUE)
+  if (nrow(ch$inserts) > 0) DBI::dbWriteTable(con, "cran_check_deadlines", ch$inserts, append = TRUE)
+  if (nrow(ch$updates) > 0) {
+    DBI::dbExecute(con,
+      "UPDATE cran_check_deadlines SET deadline = ?, last_seen = ?, resolved_on = ?, outcome = ?
+        WHERE package = ? AND episode_seq = ?",
+      params = list(ch$updates$deadline, ch$updates$last_seen, ch$updates$resolved_on,
+                    ch$updates$outcome, ch$updates$package, ch$updates$episode_seq))
+  }
+  DBI::dbCommit(con); ok <- TRUE
+
+  extended <- sum(is.na(ch$updates$outcome))
+  closed   <- sum(!is.na(ch$updates$outcome))
+  list(skipped = FALSE, new = nrow(ch$inserts), extended = extended, closed = closed)
 }

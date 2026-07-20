@@ -103,3 +103,69 @@ test_that("deadline_snapshot_healthy skips on absent column, empty snapshot, or 
   expect_true(deadline_snapshot_healthy(120L, 129L, has_col = TRUE, 0.5))     # normal churn
   expect_true(deadline_snapshot_healthy(5L, 0L, has_col = TRUE))              # bootstrap (no prior)
 })
+
+test_that("small prior sets are not skipped: churn to zero is healthy below min_prior", {
+  expect_true(deadline_snapshot_healthy(0L, 1L, has_col = TRUE))    # 1 open -> 0: normal resolution
+  expect_true(deadline_snapshot_healthy(0L, 5L, has_col = TRUE))    # below min_prior
+  expect_false(deadline_snapshot_healthy(0L, 20L, has_col = TRUE))  # at min_prior, empty snapshot -> skip
+})
+
+.pdb <- function(...) {   # minimal CRAN_package_db-shaped frame
+  rows <- list(...)
+  if (length(rows) == 0) return(data.frame(Package=character(0), Version=character(0),
+    Deadline=character(0), stringsAsFactors=FALSE))
+  do.call(rbind, lapply(rows, function(r) data.frame(Package=r[[1]], Version=r[[2]],
+    Deadline=r[[3]], stringsAsFactors=FALSE)))
+}
+.open_rows <- function(con) DBI::dbGetQuery(con,
+  "SELECT * FROM cran_check_deadlines WHERE resolved_on IS NULL ORDER BY package")
+.all_rows <- function(con) DBI::dbGetQuery(con,
+  "SELECT * FROM cran_check_deadlines ORDER BY package, episode_seq")
+
+test_that("write_deadlines opens, extends, then closes across three runs", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+
+  # Run 1: pkgA gets a deadline (NA = no deadline for pkgB, present as a current pkg)
+  r1 <- write_deadlines(con, .pdb(c("pkgA","1.0","2099-01-15"), c("pkgB","2.0",NA)),
+                        worst_status_map = c(pkgA="ERROR"), today = "2098-12-01")
+  expect_false(r1$skipped); expect_equal(r1$new, 1L)
+  o1 <- .open_rows(con); expect_equal(nrow(o1), 1L); expect_equal(o1$package, "pkgA")
+  expect_equal(o1$episode_seq, 1L); expect_equal(o1$first_seen, "2098-12-01")
+
+  # Run 2: pkgA deadline extended
+  r2 <- write_deadlines(con, .pdb(c("pkgA","1.0","2099-02-01"), c("pkgB","2.0",NA)),
+                        today = "2098-12-10")
+  expect_equal(r2$extended, 1L)
+  o2 <- .open_rows(con); expect_equal(o2$deadline, "2099-02-01"); expect_equal(o2$last_seen, "2098-12-10")
+
+  # Run 3: pkgA fixed (deadline gone), still on CRAN -> met
+  r3 <- write_deadlines(con, .pdb(c("pkgA","1.1","")), today = "2098-12-20")
+  expect_equal(r3$closed, 1L)
+  expect_equal(nrow(.open_rows(con)), 0L)
+  closed <- .all_rows(con); expect_equal(closed$outcome, "met"); expect_equal(closed$resolved_on, "2098-12-20")
+})
+
+test_that("write_deadlines skips the diff on a no-data snapshot and preserves prior rows", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  write_deadlines(con, .pdb(c("pkgA","1.0","2099-01-15"), c("pkgB","2.0","2099-01-16")),
+                  today = "2098-12-01")
+  expect_equal(nrow(.open_rows(con)), 2L)
+  # A pdb with the Deadline column entirely absent must NOT close the open episodes.
+  pdb_nocol <- data.frame(Package=c("pkgA","pkgB"), Version=c("1.0","2.0"), stringsAsFactors=FALSE)
+  r <- write_deadlines(con, pdb_nocol, today = "2098-12-02")
+  expect_true(r$skipped)
+  expect_equal(nrow(.open_rows(con)), 2L)   # both still open, unmutated
+})
+
+test_that("the open-episode unique index rejects a second open episode per package", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  write_deadlines(con, .pdb(c("pkgA","1.0","2099-01-15")), today = "2098-12-01")
+  expect_error(
+    DBI::dbExecute(con, "INSERT INTO cran_check_deadlines
+      (package, episode_seq, deadline, first_seen, last_seen)
+      VALUES ('pkgA', 99, '2099-03-01', '2098-12-01', '2098-12-01')"),
+    "UNIQUE|constraint")
+})
