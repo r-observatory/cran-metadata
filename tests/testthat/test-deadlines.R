@@ -169,3 +169,17 @@ test_that("the open-episode unique index rejects a second open episode per packa
       VALUES ('pkgA', 99, '2099-03-01', '2098-12-01', '2098-12-01')"),
     "UNIQUE|constraint")
 })
+
+test_that("write_deadlines dedups duplicate package rows from CRAN_package_db", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  # pkgA appears twice with a deadline, as real CRAN_package_db() output can.
+  pdb_dup <- data.frame(Package = c("pkgA", "pkgA", "pkgB"), Version = c("1.0", "1.0", "2.0"),
+    Deadline = c("2099-01-15", "2099-01-15", "2099-02-01"), stringsAsFactors = FALSE)
+  r <- write_deadlines(con, pdb_dup, today = "2098-12-01")   # must NOT throw on the unique index
+  expect_false(r$skipped)
+  expect_equal(r$new, 2L)                                     # pkgA once + pkgB
+  expect_equal(nrow(.open_rows(con)), 2L)
+  expect_equal(DBI::dbGetQuery(con,
+    "SELECT COUNT(*) AS n FROM cran_check_deadlines WHERE package = 'pkgA'")$n, 1L)
+})

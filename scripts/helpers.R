@@ -205,6 +205,11 @@ write_deadlines <- function(con, pdb,
     snapshot <- data.frame(package=character(0), deadline=character(0),
                            version=character(0), stringsAsFactors=FALSE)
   }
+
+  # CRAN_package_db() can contain duplicate package rows; keep the first so the
+  # open-episode unique index never trips even if the caller did not dedup pdb.
+  snapshot <- snapshot[!duplicated(snapshot$package), , drop = FALSE]
+
   current_packages <- if (is.data.frame(pdb) && "Package" %in% names(pdb)) pdb$Package else character(0)
 
   if (!deadline_snapshot_healthy(nrow(snapshot), nrow(prior_open), has_col, drop_frac_max)) {
