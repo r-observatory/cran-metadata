@@ -129,6 +129,11 @@ CREATE TABLE IF NOT EXISTS check_status_history (
 invisible(dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_package  ON check_status_history (package)"))
 invisible(dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_csh_detected ON check_status_history (detected_at)"))
 
+# Worst check status per package, shared with the deadline section (section 6b).
+# Assigned in section 3; initialised empty so the deadline section is safe if
+# section 3 errors out.
+worst_status_map <- setNames(character(0), character(0))
+
 # ---------------------------------------------------------------------------
 # Tracking variables for release notes
 # ---------------------------------------------------------------------------
@@ -261,6 +266,7 @@ tryCatch({
     worst_sev <- pmax(worst_sev, 0L)
     sev_to_status <- c("OK", "NOTE", "WARNING", "ERROR")
     worst_status <- sev_to_status[worst_sev + 1L]
+    worst_status_map <- setNames(worst_status, pkg_list)
 
     # Flavor summary: count of each status per package as JSON
     flavor_summary <- character(n_pkgs)
@@ -513,6 +519,29 @@ tryCatch({
 })
 
 # =========================================================================
+# 6b. CRAN check deadlines (pre-archival "issues need fixing before")
+# =========================================================================
+cat("\n=== 6b. CRAN Check Deadlines ===\n")
+counts$deadlines_new <- 0L
+counts$deadlines_extended <- 0L
+counts$deadlines_closed <- 0L
+tryCatch({
+  today <- as.character(Sys.Date())
+  res <- write_deadlines(con, pdb, worst_status_map = worst_status_map, today = today)
+  if (isTRUE(res$skipped)) {
+    cat("  Skipped: deadline snapshot failed the no-data floor (prior rows preserved)\n")
+  } else {
+    counts$deadlines_new <- res$new
+    counts$deadlines_extended <- res$extended
+    counts$deadlines_closed <- res$closed
+    cat("  Deadlines: ", res$new, " new, ", res$extended, " extended, ", res$closed, " closed\n", sep = "")
+  }
+}, error = function(e) {
+  cat("  ERROR:", e$message, "\n")
+  tryCatch(dbRollback(con), error = function(e2) NULL)
+})
+
+# =========================================================================
 # 7. Archival Reasons (sample of ERROR packages, limit 50)
 # =========================================================================
 cat("\n=== 7. Archival Reasons ===\n")
@@ -710,6 +739,9 @@ notes <- paste0(
   "| packages_enrichment | ", counts$enrichment, " |\n",
   "| removal_reasons | ", counts$removal_reasons, " |\n",
   "| package_news | ", counts$package_news, " |\n",
+  "| cran_check_deadlines (new) | ", counts$deadlines_new, " |\n",
+  "| cran_check_deadlines (extended) | ", counts$deadlines_extended, " |\n",
+  "| cran_check_deadlines (closed) | ", counts$deadlines_closed, " |\n",
   "| **Database size** | ", db_size, " |\n"
 )
 
