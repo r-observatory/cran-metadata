@@ -93,3 +93,67 @@ write_manifest <- function(path, core,
   writeLines(json, path)
   invisible(path)
 }
+
+#' Decide whether today's deadline snapshot is trustworthy enough to diff.
+#'
+#' A missing column, an empty snapshot against a non-empty prior open set, or a
+#' single-run drop in the open set beyond `drop_frac_max` all signal a bad input
+#' (e.g. CRAN renamed/removed the undocumented Deadline column, or a partial
+#' fetch). In those cases the caller skips the diff and preserves prior rows,
+#' rather than mass-closing every open episode as "met".
+deadline_snapshot_healthy <- function(snapshot_n, prior_open_n, has_col,
+                                      drop_frac_max = 0.5) {
+  if (!isTRUE(has_col)) return(FALSE)
+  if (snapshot_n == 0L && prior_open_n > 0L) return(FALSE)
+  if (prior_open_n > 0L &&
+      (prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
+  TRUE
+}
+
+#' Diff today's non-NA Deadline snapshot against the prior open episodes.
+#'
+#' Returns `inserts` (new open episodes, all ten columns) and `updates` (one row
+#' per changed existing episode, columns deadline/last_seen/resolved_on/outcome/
+#' package/episode_seq). The open marker is resolved_on IS NULL; outcome is only
+#' ever NA, "met", or "vanished" here (the viewer enrich upgrades to "archived").
+compute_deadline_changes <- function(prior_open, snapshot, current_packages,
+                                     worst_status_map, max_seq_map, today) {
+  open_pkgs  <- prior_open$package
+  snap_pkgs  <- snapshot$package
+  cur        <- unique(current_packages)
+
+  ins <- data.frame(package=character(0), episode_seq=integer(0), deadline=character(0),
+    version=character(0), worst_status=character(0), first_seen=character(0),
+    last_seen=character(0), resolved_on=character(0), outcome=character(0),
+    archived_on=character(0), stringsAsFactors=FALSE)
+  upd <- data.frame(deadline=character(0), last_seen=character(0), resolved_on=character(0),
+    outcome=character(0), package=character(0), episode_seq=integer(0), stringsAsFactors=FALSE)
+
+  # 1. Packages with a deadline today.
+  for (i in seq_along(snap_pkgs)) {
+    p <- snap_pkgs[i]; d <- snapshot$deadline[i]; v <- snapshot$version[i]
+    j <- match(p, open_pkgs)
+    if (!is.na(j)) {
+      # re-observed: extend last_seen and the (possibly changed) deadline; stay open
+      upd[nrow(upd) + 1L, ] <- list(d, today, NA_character_, NA_character_, p, prior_open$episode_seq[j])
+    } else {
+      # brand-new open episode
+      seq_next <- if (!is.na(max_seq_map[p])) as.integer(max_seq_map[p]) + 1L else 1L
+      ws <- if (!is.na(worst_status_map[p])) unname(worst_status_map[p]) else NA_character_
+      ins[nrow(ins) + 1L, ] <- list(p, seq_next, d, v, ws, today, today,
+                                    NA_character_, NA_character_, NA_character_)
+    }
+  }
+
+  # 2. Prior open episodes with no deadline today -> close.
+  gone <- setdiff(open_pkgs, snap_pkgs)
+  for (p in gone) {
+    j <- match(p, open_pkgs)
+    outcome <- if (p %in% cur) "met" else "vanished"
+    # last_seen and deadline unchanged (not observed today); only mark resolved.
+    upd[nrow(upd) + 1L, ] <- list(prior_open$deadline[j], prior_open$last_seen[j],
+                                  today, outcome, p, prior_open$episode_seq[j])
+  }
+
+  list(inserts = ins, updates = upd)
+}
