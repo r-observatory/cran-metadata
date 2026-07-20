@@ -41,10 +41,20 @@ jobs:
         run: Rscript tests/testthat.R
 
       - name: Download previous database
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release download --pattern "metadata.db"
+        run: |
+          set -euo pipefail
+          # List releases so a transient API error fails the job (set -e on the
+          # plain assignment) instead of being mistaken for "no releases" and
+          # silently cold-starting, which would re-baseline cran_check_deadlines
+          # first_seen/episode_seq. Empty output means a genuine first-run bootstrap.
+          releases="$(gh release list --limit 1)"
+          if [ -n "$releases" ]; then
+            gh release download --pattern "metadata.db"
+          else
+            echo "No prior release exists yet; legitimate bootstrap, starting fresh."
+          fi
 
       - name: Validate downloaded database
         if: hashFiles('metadata.db') != ''
@@ -62,6 +72,8 @@ jobs:
                 package TEXT NOT NULL, status TEXT NOT NULL,
                 flavor_summary TEXT, details TEXT, detected_at TEXT NOT NULL)")
               dbGetQuery(con, "SELECT COUNT(*) FROM check_status_history")
+              if (dbExistsTable(con, "cran_check_deadlines"))
+                dbGetQuery(con, "SELECT COUNT(*) FROM cran_check_deadlines")
               cat("Database OK\n")
             }, error = function(e) {
               cat("Database corrupted:", conditionMessage(e), "\n")
