@@ -41,10 +41,19 @@ jobs:
         run: Rscript tests/testthat.R
 
       - name: Download previous database
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release download --pattern "metadata.db"
+        run: |
+          set -euo pipefail
+          # A prior release is authoritative. Downloading it must succeed, or the
+          # run must fail: cold-starting would re-baseline cran_check_deadlines
+          # first_seen/episode_seq (unlike the rebuild-tolerant check_status_history).
+          # Distinguish that from a genuine first run, where no release exists yet.
+          if gh release view --json tagName >/dev/null 2>&1; then
+            gh release download --pattern "metadata.db"
+          else
+            echo "No prior release exists yet; legitimate bootstrap, starting fresh."
+          fi
 
       - name: Validate downloaded database
         if: hashFiles('metadata.db') != ''
@@ -62,6 +71,12 @@ jobs:
                 package TEXT NOT NULL, status TEXT NOT NULL,
                 flavor_summary TEXT, details TEXT, detected_at TEXT NOT NULL)")
               dbGetQuery(con, "SELECT COUNT(*) FROM check_status_history")
+              dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
+                package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
+                version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+                resolved_on TEXT, outcome TEXT, archived_on TEXT,
+                PRIMARY KEY (package, episode_seq))")
+              dbGetQuery(con, "SELECT COUNT(*) FROM cran_check_deadlines")
               cat("Database OK\n")
             }, error = function(e) {
               cat("Database corrupted:", conditionMessage(e), "\n")
