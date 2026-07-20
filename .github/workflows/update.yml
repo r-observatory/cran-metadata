@@ -45,11 +45,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # A prior release is authoritative. Downloading it must succeed, or the
-          # run must fail: cold-starting would re-baseline cran_check_deadlines
-          # first_seen/episode_seq (unlike the rebuild-tolerant check_status_history).
-          # Distinguish that from a genuine first run, where no release exists yet.
-          if gh release view --json tagName >/dev/null 2>&1; then
+          # List releases so a transient API error fails the job (set -e on the
+          # plain assignment) instead of being mistaken for "no releases" and
+          # silently cold-starting, which would re-baseline cran_check_deadlines
+          # first_seen/episode_seq. Empty output means a genuine first-run bootstrap.
+          releases="$(gh release list --limit 1)"
+          if [ -n "$releases" ]; then
             gh release download --pattern "metadata.db"
           else
             echo "No prior release exists yet; legitimate bootstrap, starting fresh."
