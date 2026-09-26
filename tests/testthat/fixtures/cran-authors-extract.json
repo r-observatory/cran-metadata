@@ -1,0 +1,2002 @@
+[
+  {
+    "given": "Rodrigo",
+    "family": "García-Valiente",
+    "email": null,
+    "role": "cre, aut",
+    "comment": "someone@example.org",
+    "ORCID": "0000-0003-0444-5587",
+    "ROR": null,
+    "package": "AbSolution"
+  },
+  {
+    "given": "Mark",
+    "family": "Monmonier",
+    "email": null,
+    "role": "ctb",
+    "comment": "Contributor and author of the state.vbm dataset in spData.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "agridatasets"
+  },
+  {
+    "given": "Rodrigo",
+    "family": "Lilla Manzione",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "agriwater"
+  },
+  {
+    "given": "Alejandro",
+    "family": "Bernárdez Ferradás",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "SiDOR. Departamento de Estatística e Investigación Operativa. Universidade de Vigo. CITMAga. Spain",
+    "ORCID": "0009-0006-0960-3555",
+    "ROR": null,
+    "package": "AirportProblems"
+  },
+  {
+    "given": "Estela",
+    "family": "Sánchez Rodríguez",
+    "email": null,
+    "role": "aut",
+    "comment": "SiDOR. Departamento de Estatística e Investigación Operativa. Universidade de Vigo. CITMAga. Spain",
+    "ORCID": "0000-0002-0933-6411",
+    "ROR": null,
+    "package": "AirportProblems"
+  },
+  {
+    "given": "Miguel Ángel",
+    "family": "Mirás Calvo",
+    "email": null,
+    "role": "aut",
+    "comment": "RGEAF. Departamento de Matemáticas. Universidade de Vigo. Spain",
+    "ORCID": "0000-0001-7247-1926",
+    "ROR": null,
+    "package": "AirportProblems"
+  },
+  {
+    "given": "Maxwell",
+    "family": "Mansolf",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0001-6861-8657",
+    "ROR": null,
+    "package": "AlignLV"
+  },
+  {
+    "given": "Brice",
+    "family": "Lebrun",
+    "email": null,
+    "role": "art",
+    "comment": "Logo designer",
+    "ORCID": "0000-0001-7503-8685",
+    "ROR": null,
+    "package": "alkahest"
+  },
+  {
+    "given": "Cédric",
+    "family": "Heuchenne",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0002-3150-3044",
+    "ORCID": null,
+    "ROR": null,
+    "package": "AssociationExplorer2"
+  },
+  {
+    "given": "Arnaud",
+    "family": "Claes",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0003-0716-0798",
+    "ORCID": null,
+    "ROR": null,
+    "package": "AssociationExplorer2"
+  },
+  {
+    "given": "Antonin",
+    "family": "Descampe",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0002-0943-4126",
+    "ORCID": null,
+    "ROR": null,
+    "package": "AssociationExplorer2"
+  },
+  {
+    "given": "Trustees of",
+    "family": "Columbia University",
+    "email": null,
+    "role": "cph",
+    "comment": "package skeleton",
+    "ORCID": null,
+    "ROR": null,
+    "package": "baggr"
+  },
+  {
+    "given": "Merlise",
+    "family": "Clyde",
+    "email": null,
+    "role": "aut, cre, ths",
+    "comment": "ORCID=0000-0002-3595-1872",
+    "ORCID": null,
+    "ROR": null,
+    "package": "bark"
+  },
+  {
+    "given": "Adam",
+    "family": "Kapelner",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: 0000-0001-5985-6792",
+    "ORCID": null,
+    "ROR": null,
+    "package": "bartMachineJARs"
+  },
+  {
+    "given": "Merlise",
+    "family": "Clyde",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "ORCID=0000-0002-3595-1872",
+    "ORCID": null,
+    "ROR": null,
+    "package": "BAS"
+  },
+  {
+    "given": "Dai",
+    "family": "Feng",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "bayesImageS"
+  },
+  {
+    "given": "Arthur",
+    "family": "White",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "Previous email address: someone@example.org",
+    "ORCID": null,
+    "ROR": null,
+    "package": "BayesLCA"
+  },
+  {
+    "given": "Niel",
+    "family": "le Roux",
+    "email": null,
+    "role": "cre",
+    "comment": "Some Fortran code is adapted by Niel le Roux\n        from the original by PJ Rousseeuw, I Ruts and JW Tukey",
+    "ORCID": null,
+    "ROR": null,
+    "package": "BiplotGUI"
+  },
+  {
+    "given": "George",
+    "family": "Karabatsos",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: <https://orcid.org/0000-0003-4243-2285>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "bnpMTP"
+  },
+  {
+    "given": "Steven L.",
+    "family": "Scott",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "Steven L. Scott is the sole author and creator of the BOOM\n\t          project.  Some code in the BOOM libraries has been modified from other open\n\t\t  source projects.  These include Cephes (obtained from Netlib, written by\n\t\t  Stephen L. Moshier), NEWUOA (M.J.D Powell, obtained from Powell's web site),\n \t\t  and a modified version of the R math libraries (R core development team).\n \t\t  Original copyright notices have been maintained in all source files.  In\n \t\t  these cases, copyright claimed by Steven L. Scott is limited to modifications\n \t\t  made to the original code.  Google claims copyright for code written while\n \t\t  Steven L. Scott was employed at Google from 2008 - 2018, but BOOM is not an\n \t\t  officially supported Google project.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "Boom"
+  },
+  {
+    "given": "Harkunwar S.",
+    "family": "Kochar",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "bootkmeans"
+  },
+  {
+    "given": "Gabi",
+    "family": "Huiber",
+    "email": null,
+    "role": "ctb, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "BTYD"
+  },
+  {
+    "given": "Franz X.",
+    "family": "Mohr",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0009-0003-8890-7781",
+    "ORCID": null,
+    "ROR": null,
+    "package": "bvartools"
+  },
+  {
+    "given": "Raymond",
+    "family": "Carragher",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0002-0120-625X",
+    "ROR": null,
+    "package": "c212"
+  },
+  {
+    "given": "Allison",
+    "family": "Williams",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "cdmetapopR"
+  },
+  {
+    "given": "James",
+    "family": "Dillon",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "Author and copyright holder of source code adapted from the\n    'Chromatography Toolbox' for parsing 'Agilent' FID files.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "chromConverter"
+  },
+  {
+    "given": "G. C.",
+    "family": "Livingston Jr",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "CMHNPA"
+  },
+  {
+    "given": "James",
+    "family": "Dalgleish",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "Alternate contact: someone@example.org",
+    "ORCID": null,
+    "ROR": null,
+    "package": "CNVScope"
+  },
+  {
+    "given": "Alexander",
+    "family": "Hapfelmeier",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0001-6765-6352",
+    "ROR": null,
+    "package": "coat"
+  },
+  {
+    "given": "Andrea",
+    "family": "Mazzoleni",
+    "email": null,
+    "role": "cph",
+    "comment": "tommy hash table library",
+    "ORCID": null,
+    "ROR": null,
+    "package": "collections"
+  },
+  {
+    "given": "Nicholas",
+    "family": "Potter",
+    "email": null,
+    "role": "rev",
+    "comment": "Nicholas reviewed the package for rOpenSci, \n                  see https://github.com/ropensci/software-review/issues/613",
+    "ORCID": "0000-0002-3410-3732",
+    "ROR": null,
+    "package": "comtradr"
+  },
+  {
+    "given": "Novo Nordisk A/S",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "connector.sharepoint"
+  },
+  {
+    "given": "Sarah",
+    "family": "Weinstein",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "ConversationAlign"
+  },
+  {
+    "given": "Alex",
+    "family": "Reinhart",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0002-6658-514X",
+    "ROR": null,
+    "package": "covidcast"
+  },
+  {
+    "given": "Lee",
+    "family": "McDaniel",
+    "email": null,
+    "role": "ctb",
+    "comment": "Author of R package geeM, which has been\n        modfied and references in multiple R files",
+    "ORCID": null,
+    "ROR": null,
+    "package": "CRTgeeDR"
+  },
+  {
+    "given": "three.js authors",
+    "family": null,
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "three.js library",
+    "ORCID": null,
+    "ROR": null,
+    "package": "cubeview"
+  },
+  {
+    "given": "Shu",
+    "family": "Xie",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0001-9594-946X",
+    "ROR": null,
+    "package": "DAISIE"
+  },
+  {
+    "given": "Arthur",
+    "family": "Lins de Vasconcellos",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "datazoom.social"
+  },
+  {
+    "given": "David",
+    "family": "Miller",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "Distance"
+  },
+  {
+    "given": "Florian",
+    "family": "Camphausen",
+    "email": null,
+    "role": "ctb",
+    "comment": "contributed as student in\n            the initial phase --2005",
+    "ORCID": null,
+    "ROR": null,
+    "package": "distrSim"
+  },
+  {
+    "given": "ICAR-NBGPR",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": "https://nbpgr.org.in/",
+    "ORCID": null,
+    "ROR": "https://ror.org/00scbd467",
+    "package": "DiversityStats"
+  },
+  {
+    "given": "Posit Software, PBC",
+    "family": null,
+    "email": null,
+    "role": "cph, fnd",
+    "comment": null,
+    "ORCID": null,
+    "ROR": "https://ror.org/03wc8by49",
+    "package": "doclisting"
+  },
+  {
+    "given": "Luca",
+    "family": "Sartore",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = \"0000-0002-0446-1328\"",
+    "ORCID": null,
+    "ROR": null,
+    "package": "dual"
+  },
+  {
+    "given": "Luca",
+    "family": "Sartore",
+    "email": null,
+    "role": "cre",
+    "comment": "ORCID = \"0000-0002-0446-1328\"",
+    "ORCID": null,
+    "ROR": null,
+    "package": "dual"
+  },
+  {
+    "given": "Pierre-Alexandre",
+    "family": "Balland",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "EconGeo"
+  },
+  {
+    "given": "Colin",
+    "family": "Smith",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0003-2261-9931",
+    "ORCID": null,
+    "ROR": null,
+    "package": "EDIutils"
+  },
+  {
+    "given": "Corinna",
+    "family": "Gries",
+    "email": null,
+    "role": "ctb",
+    "comment": "0000-0002-9091-6543",
+    "ORCID": null,
+    "ROR": null,
+    "package": "EDIutils"
+  },
+  {
+    "given": "Jasmine",
+    "family": "Lai",
+    "email": null,
+    "role": "rev",
+    "comment": "0000-0001-8888-547X",
+    "ORCID": null,
+    "ROR": null,
+    "package": "EDIutils"
+  },
+  {
+    "given": "Rodrigo",
+    "family": "Pires",
+    "email": null,
+    "role": "rev",
+    "comment": "0000-0001-7384-6849",
+    "ORCID": null,
+    "ROR": null,
+    "package": "EDIutils"
+  },
+  {
+    "given": "Sebastiano",
+    "family": "Vigna",
+    "email": null,
+    "role": "ctb",
+    "comment": "Original xoshiro.c implementation",
+    "ORCID": null,
+    "ROR": null,
+    "package": "EGAnet"
+  },
+  {
+    "given": "Hugo",
+    "family": "Gruson",
+    "email": null,
+    "role": "ctb, rev",
+    "comment": null,
+    "ORCID": "0000-0002-4094-1476",
+    "ROR": null,
+    "package": "epichains"
+  },
+  {
+    "given": "Louis",
+    "family": "Macias",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "ORCID = <https://orcid.org/0000-0002-3080-2835>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "extraSuperpower"
+  },
+  {
+    "given": "Silke",
+    "family": "Szymczak",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = <https://orcid.org/0000-0002-8897-9035>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "extraSuperpower"
+  },
+  {
+    "given": "Merlin",
+    "family": "Unterfinger",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0003-2020-2366",
+    "ROR": null,
+    "package": "fca"
+  },
+  {
+    "given": "Mike",
+    "family": "Johnson",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": "0000-0002-5288-8350",
+    "ROR": null,
+    "package": "fipio"
+  },
+  {
+    "given": "Jingsi",
+    "family": "Ming",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "R package development and method implementation, ORCID: 0000-0001-7059-4156",
+    "ORCID": null,
+    "ROR": null,
+    "package": "FIRM"
+  },
+  {
+    "given": "Yixuan",
+    "family": "Qiu",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "'Spectra' library for large-scale eigenvalue and SVD computation",
+    "ORCID": null,
+    "ROR": null,
+    "package": "FIRM"
+  },
+  {
+    "given": "Mohamed El Fodil",
+    "family": "Ihaddaden",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "flipdownr"
+  },
+  {
+    "given": "Teng",
+    "family": "Fei",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": "0000-0001-7888-1715",
+    "ROR": null,
+    "package": "FLORAL"
+  },
+  {
+    "given": "S. Christian Collins",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": "author of generaluser-gs \n      soundbank",
+    "ORCID": null,
+    "ROR": null,
+    "package": "fluidsynth"
+  },
+  {
+    "given": "Brady",
+    "family": "Hardiman",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "forestr"
+  },
+  {
+    "given": "Ruben",
+    "family": "Arslan",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0002-6670-5658",
+    "ROR": null,
+    "package": "formr"
+  },
+  {
+    "given": "Sungho",
+    "family": "Won",
+    "email": null,
+    "role": "ths",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "fusedMGM"
+  },
+  {
+    "given": "Jing Hua",
+    "family": "Zhao",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0003-4930-3582",
+    "ORCID": "0000-0002-1463-5870",
+    "ROR": null,
+    "package": "gap"
+  },
+  {
+    "given": "Rodaba",
+    "family": "Zaman Adrita",
+    "email": null,
+    "role": "aut, dtc",
+    "comment": "Word collection and gender dictionary curation",
+    "ORCID": null,
+    "ROR": null,
+    "package": "gendertext"
+  },
+  {
+    "given": "Marc",
+    "family": "Ditzhaus",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "GFDrmtl"
+  },
+  {
+    "given": "Brian D.",
+    "family": "Ripley",
+    "email": null,
+    "role": "aut",
+    "comment": "author of package tree",
+    "ORCID": null,
+    "ROR": null,
+    "package": "ggdendro"
+  },
+  {
+    "given": "French National Research Agency",
+    "family": null,
+    "email": null,
+    "role": "cph, fnd",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "GGIR"
+  },
+  {
+    "given": "Kohske",
+    "family": "Takahashi",
+    "email": null,
+    "role": "ctb",
+    "comment": "original author of 'geom_holygon'",
+    "ORCID": null,
+    "ROR": null,
+    "package": "ggpolypath"
+  },
+  {
+    "given": "Jeffrey B.",
+    "family": "Arnold",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "<https://orcid.org/0000-0001-9953-3904>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "ggthemes"
+  },
+  {
+    "given": "Marjolein",
+    "family": "Fokkema",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0002-9252-8325",
+    "ROR": null,
+    "package": "glmertree"
+  },
+  {
+    "given": "Randall C.",
+    "family": "Johnson",
+    "email": null,
+    "role": "aut",
+    "comment": "Contributions from Randall C. Johnson are Copyright (2005) SAIC-Frederick, Inc. Funded by the Intramural Research\n        Program, of the NIH, National Cancer Institute, Center for Cancer Research under NCI Contract NO1-CO-12400",
+    "ORCID": null,
+    "ROR": null,
+    "package": "gmodels"
+  },
+  {
+    "given": "Adam",
+    "family": "Kapelner",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: 0000-0001-5985-6792",
+    "ORCID": null,
+    "ROR": null,
+    "package": "GreedyExperimentalDesign"
+  },
+  {
+    "given": "Antonio",
+    "family": "Castro",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "harbinger"
+  },
+  {
+    "given": "Junyang",
+    "family": "Qian",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "hierNest"
+  },
+  {
+    "given": "Esra",
+    "family": "Gökpınar",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0003-2148-4940",
+    "ROR": null,
+    "package": "homnormal"
+  },
+  {
+    "given": "Jun",
+    "family": "Yan",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0003-4401-7296",
+    "ROR": null,
+    "package": "ibist"
+  },
+  {
+    "given": "Hrishikesh",
+    "family": "Chakraborty",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "ICCbin"
+  },
+  {
+    "given": "Anne",
+    "family": "Ruiz-Gazen",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0001-8970-8061",
+    "ROR": null,
+    "package": "ICSShiny"
+  },
+  {
+    "given": "Luca",
+    "family": "Sartore",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = \"0000-0002-0446-1328\"",
+    "ORCID": null,
+    "ROR": null,
+    "package": "inca"
+  },
+  {
+    "given": "Luca",
+    "family": "Sartore",
+    "email": null,
+    "role": "cre",
+    "comment": "ORCID = \"0000-0002-0446-1328\"",
+    "ORCID": null,
+    "ROR": null,
+    "package": "inca"
+  },
+  {
+    "given": "François",
+    "family": "Rousset",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0003-4670-0371",
+    "ROR": null,
+    "package": "IsoriX"
+  },
+  {
+    "given": "S.",
+    "family": "Mohanasundaram",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID = 0000-0003-4639-9419",
+    "ORCID": null,
+    "ROR": null,
+    "package": "jackknifeR"
+  },
+  {
+    "given": "Renzo",
+    "family": "Caceres Rossi",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0009-0005-0744-854X",
+    "ROR": null,
+    "package": "JapanAPIs"
+  },
+  {
+    "given": "Elen",
+    "family": "Le Foll",
+    "email": null,
+    "role": "ctb",
+    "comment": "BNC\n                    tagset",
+    "ORCID": null,
+    "ROR": null,
+    "package": "koRpus.lang.en"
+  },
+  {
+    "given": "Artur",
+    "family": "Gramacki",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": "0000-0002-1610-9743",
+    "ROR": null,
+    "package": "ks"
+  },
+  {
+    "given": "Bangyou",
+    "family": "Zheng",
+    "email": null,
+    "role": "ctb",
+    "comment": "Leaflet-search and Leaflet-GPS plugin integration",
+    "ORCID": null,
+    "ROR": null,
+    "package": "leaflet.extras"
+  },
+  {
+    "given": "Filip",
+    "family": "Zavadil",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "leaflet-pulse-icon library",
+    "ORCID": null,
+    "ROR": null,
+    "package": "leaflet.extras"
+  },
+  {
+    "given": "Tim",
+    "family": "Riffe",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0002-2673-4622",
+    "ORCID": null,
+    "ROR": null,
+    "package": "LEdecomp"
+  },
+  {
+    "given": "David",
+    "family": "Atance",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0001-5860-0584",
+    "ORCID": null,
+    "ROR": null,
+    "package": "LEdecomp"
+  },
+  {
+    "given": "Josep",
+    "family": "Lledo",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0002-7475-8549",
+    "ORCID": null,
+    "ROR": null,
+    "package": "LEdecomp"
+  },
+  {
+    "given": "Ryan",
+    "family": "Browne",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0003-4543-0218",
+    "ORCID": null,
+    "ROR": null,
+    "package": "leptokurticMixture"
+  },
+  {
+    "given": "Paul",
+    "family": "Ramsey",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "libgeos"
+  },
+  {
+    "given": "Piotr",
+    "family": "Stanczyk",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "libopenexr"
+  },
+  {
+    "given": "Troy",
+    "family": "Hernandez",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0009-0005-4248-604X",
+    "ROR": null,
+    "package": "llm.api"
+  },
+  {
+    "given": "Vaclav",
+    "family": "Bubenicek",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "Czech University of Life Sciences Prague (CZU)",
+    "ORCID": "0000-0002-0906-0750",
+    "ROR": null,
+    "package": "lpanda"
+  },
+  {
+    "given": "Benedict",
+    "family": "Risebrow",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "LRMiss"
+  },
+  {
+    "given": "Dawid",
+    "family": "Kałędkowski",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: <https://orcid.org/0000-0001-9533-457X>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "marimekko"
+  },
+  {
+    "given": "Leopoldo",
+    "family": "Catania",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: <https://orcid.org/0000-0002-0981-1921>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "MCS"
+  },
+  {
+    "given": "Beatrijs",
+    "family": "Moerkerke",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "medflex"
+  },
+  {
+    "given": "Asa",
+    "family": "Palley",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "metaggR"
+  },
+  {
+    "given": "James",
+    "family": "Hollway",
+    "email": null,
+    "role": "cre, aut, ctb",
+    "comment": "IHEID",
+    "ORCID": "0000-0002-8361-9647",
+    "ROR": null,
+    "package": "migraph"
+  },
+  {
+    "given": "Robert",
+    "family": "Davies",
+    "email": null,
+    "role": "ctb",
+    "comment": "quadratic form probabilities",
+    "ORCID": null,
+    "ROR": null,
+    "package": "MixSim"
+  },
+  {
+    "given": "Victor",
+    "family": "Lachos",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0002-7239-2459",
+    "ROR": null,
+    "package": "mixsmsn"
+  },
+  {
+    "given": "Kirill",
+    "family": "Müller",
+    "email": null,
+    "role": "aut, cph",
+    "comment": "Creator of the package",
+    "ORCID": null,
+    "ROR": null,
+    "package": "mlfit"
+  },
+  {
+    "given": "Denis",
+    "family": "dos Reis",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "mlquantify"
+  },
+  {
+    "given": "Pascal",
+    "family": "Kerschke",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": "0000-0003-2862-1418",
+    "ROR": null,
+    "package": "mlr"
+  },
+  {
+    "given": "Thomas",
+    "family": "Charlon",
+    "email": null,
+    "role": "ctb",
+    "comment": "ORCID: 0000-0001-7497-0470",
+    "ORCID": null,
+    "ROR": null,
+    "package": "MUGS"
+  },
+  {
+    "given": "Skye",
+    "family": "Bender-deMoll",
+    "email": null,
+    "role": "cre, aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "ndtv"
+  },
+  {
+    "given": "Bradley R",
+    "family": "Buchsbaum",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "neuroim2"
+  },
+  {
+    "given": "Iain S.",
+    "family": "Duff",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "SuiteSparse AMD and CAMD components",
+    "ORCID": null,
+    "ROR": null,
+    "package": "ngme2"
+  },
+  {
+    "given": "Chris",
+    "family": "Hartgerink",
+    "email": null,
+    "role": "rev",
+    "comment": null,
+    "ORCID": "0000-0003-1050-6809",
+    "ROR": null,
+    "package": "numberize"
+  },
+  {
+    "given": "Robert K.",
+    "family": "Bauer",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: 0000-0003-4224-8023",
+    "ORCID": null,
+    "ROR": null,
+    "package": "oceanmap"
+  },
+  {
+    "given": "Pascal",
+    "family": "Pucholt",
+    "email": null,
+    "role": "aut",
+    "comment": "AskPascal",
+    "ORCID": "0000-0003-3342-1373",
+    "ROR": null,
+    "package": "OlinkAnalyze"
+  },
+  {
+    "given": "R.",
+    "family": "Munos",
+    "email": null,
+    "role": "aut",
+    "comment": "Python and Matlab original",
+    "ORCID": null,
+    "ROR": null,
+    "package": "OOR"
+  },
+  {
+    "given": "Jessica",
+    "family": "Myers",
+    "email": null,
+    "role": "ctb",
+    "comment": "author of 'mederrRank'",
+    "ORCID": null,
+    "ROR": null,
+    "package": "openEBGM"
+  },
+  {
+    "given": "Peter",
+    "family": "Organisciak",
+    "email": null,
+    "role": "ctb",
+    "comment": "University of Denver",
+    "ORCID": "0000-0002-9058-2280",
+    "ROR": null,
+    "package": "openscoring"
+  },
+  {
+    "given": "Andrew",
+    "family": "Turpin",
+    "email": null,
+    "role": "cre, aut, cph",
+    "comment": "ORCID: 0000-0003-2559-8769",
+    "ORCID": null,
+    "ROR": null,
+    "package": "OPI"
+  },
+  {
+    "given": "Unicode, Inc.",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": "Bundled Rust crate unicode-ident (Unicode-3.0 data tables)",
+    "ORCID": null,
+    "ROR": null,
+    "package": "osmnxr"
+  },
+  {
+    "given": "Alberto J.",
+    "family": "Coello",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID = 0000-0002-2665-3726",
+    "ORCID": null,
+    "ROR": null,
+    "package": "PAICE"
+  },
+  {
+    "given": "Mario",
+    "family": "Fernández-Mazuecos",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = 0000-0003-4027-6477",
+    "ORCID": null,
+    "ROR": null,
+    "package": "PAICE"
+  },
+  {
+    "given": "Ruben H.",
+    "family": "Heleno",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = 0000-0002-4808-4907",
+    "ORCID": null,
+    "ROR": null,
+    "package": "PAICE"
+  },
+  {
+    "given": "Pablo",
+    "family": "Vargas",
+    "email": null,
+    "role": "aut",
+    "comment": "ORCID = 0000-0003-4502-0382",
+    "ORCID": null,
+    "ROR": null,
+    "package": "PAICE"
+  },
+  {
+    "given": null,
+    "family": "Gimp",
+    "email": null,
+    "role": "cph",
+    "comment": "copyright holder for palettes imported from Gimp",
+    "ORCID": null,
+    "ROR": null,
+    "package": "palettesForR"
+  },
+  {
+    "given": "Christian",
+    "family": "Testa",
+    "email": null,
+    "role": "rev",
+    "comment": "Christian reviewed the package (v. 0.1.1) for rOpenSci, see <https://github.com/ropensci/software-review/issues/703>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "partialling.out"
+  },
+  {
+    "given": "Nicolas",
+    "family": "Mas",
+    "email": null,
+    "role": "ctb, rev",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "pathlit"
+  },
+  {
+    "given": "Corey",
+    "family": "Bakalarski",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "PepMapViz"
+  },
+  {
+    "given": "Sbonelo",
+    "family": "Chamane",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: 0000-0001-5350-5203",
+    "ORCID": null,
+    "ROR": null,
+    "package": "pickmax"
+  },
+  {
+    "given": "Jing Hua",
+    "family": "Zhao",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0003-4930-3582",
+    "ORCID": "0000-0002-1463-5870",
+    "ROR": null,
+    "package": "pQTLdata"
+  },
+  {
+    "given": "Wei-Chen",
+    "family": "Chen",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "psrwe"
+  },
+  {
+    "given": "Ingo",
+    "family": "Rohlfing",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0001-8715-4771",
+    "ORCID": null,
+    "ROR": null,
+    "package": "QCAcluster"
+  },
+  {
+    "given": "Jan",
+    "family": "Schwalbach",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0002-6990-8098",
+    "ORCID": null,
+    "ROR": null,
+    "package": "QCAcluster"
+  },
+  {
+    "given": "Maria Paula",
+    "family": "Caldas",
+    "email": null,
+    "role": "rev",
+    "comment": "Maria Paula Caldas reviewed the package (v. 0.0.0.9000) for rOpenSci,\n           see https://github.com/ropensci/software-review/issues/619",
+    "ORCID": "0000-0002-1938-6471",
+    "ROR": null,
+    "package": "quadkeyr"
+  },
+  {
+    "given": "Vincent",
+    "family": "van Hees",
+    "email": null,
+    "role": "rev",
+    "comment": "Vincent van Hees reviewed the package (v. 0.0.0.9000) for rOpenSci, \n           see https://github.com/ropensci/software-review/issues/619",
+    "ORCID": "0000-0003-0182-9008",
+    "ROR": null,
+    "package": "quadkeyr"
+  },
+  {
+    "given": "Brian D",
+    "family": "Ripley",
+    "email": null,
+    "role": "trl, ctb",
+    "comment": "Initial (2001) R port from S (to my everlasting shame -- \n\thow could I have been so slow to adopt R!) and for numerous other \n\tsuggestions and useful advice",
+    "ORCID": null,
+    "ROR": null,
+    "package": "quantreg"
+  },
+  {
+    "given": "University of Maryland",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": "ANN library is copyright University of Maryland and Sunil Arya and\n    David Mount. See file COPYRIGHT for details",
+    "ORCID": null,
+    "ROR": null,
+    "package": "RANN"
+  },
+  {
+    "given": "Clinton",
+    "family": "Mccrowey",
+    "email": null,
+    "role": "cre, aut",
+    "comment": "United States Environmental Protection\n                             Agency Region 3 Air and Radiation Division",
+    "ORCID": null,
+    "ROR": null,
+    "package": "RAQSAPI"
+  },
+  {
+    "given": "Robert K.",
+    "family": "Bauer",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: 0000-0003-4224-8023",
+    "ORCID": null,
+    "ROR": null,
+    "package": "RchivalTag"
+  },
+  {
+    "given": "Zhiqiang",
+    "family": "Nie",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "ORCID = 0000-0001-7642-3286, wechat = Biostatistics-SCI",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rcssci"
+  },
+  {
+    "given": "Jean-François",
+    "family": "Rey",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "rdatagouv"
+  },
+  {
+    "given": "Razvan",
+    "family": "Romanescu",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "REffectivePred"
+  },
+  {
+    "given": "Scott",
+    "family": "Chamberlain",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0003-1444-9135",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "Damiano",
+    "family": "Oldoni",
+    "email": null,
+    "role": "aut",
+    "comment": "0000-0003-3445-7562",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "Vijay",
+    "family": "Barve",
+    "email": null,
+    "role": "ctb",
+    "comment": "0000-0002-4852-2567",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "Peter",
+    "family": "Desmet",
+    "email": null,
+    "role": "ctb",
+    "comment": "0000-0002-8442-8025",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "Dan",
+    "family": "Mcglinn",
+    "email": null,
+    "role": "ctb",
+    "comment": "0000-0003-2359-3526",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "Karthik",
+    "family": "Ram",
+    "email": null,
+    "role": "ctb",
+    "comment": "0000-0002-0233-1757",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "John",
+    "family": "Waller",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0002-7302-5976",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rgbif"
+  },
+  {
+    "given": "jQuery Foundation",
+    "family": null,
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "jQuery.js library",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rhandsontable"
+  },
+  {
+    "given": "R Core Team",
+    "family": null,
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "Copyright holder of Rinternals.h, R.h, lm.c, Applic.h, statsR.h,\n      glm package",
+    "ORCID": null,
+    "ROR": null,
+    "package": "riskscores"
+  },
+  {
+    "given": "University College London",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "rmcmc"
+  },
+  {
+    "given": "Tuija",
+    "family": "Sonkkila",
+    "email": null,
+    "role": "rev",
+    "comment": "Tuija Sonkkila \n    reviewed the package for rOpenSci, \n    see https://github.com/ropensci/onboarding/issues/115",
+    "ORCID": "0000-0002-6892-9305",
+    "ROR": null,
+    "package": "roadoi"
+  },
+  {
+    "given": "Vincent",
+    "family": "Drenth",
+    "email": null,
+    "role": "ctb",
+    "comment": "initial prototype of GUI",
+    "ORCID": null,
+    "ROR": null,
+    "package": "robmedExtra"
+  },
+  {
+    "given": "Max",
+    "family": "Czapanskiy",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0002-6302-905X",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rorqual.morpho"
+  },
+  {
+    "given": "Centers for Disease Control and Prevention",
+    "family": null,
+    "email": null,
+    "role": "aut, cph",
+    "comment": "https://ror.org/042twtr12",
+    "ORCID": null,
+    "ROR": null,
+    "package": "RSTr"
+  },
+  {
+    "given": "Arturo",
+    "family": "Sanchez-Azofeifa",
+    "email": null,
+    "role": "dgs, sad",
+    "comment": null,
+    "ORCID": "0000-0001-7768-6600",
+    "ROR": null,
+    "package": "rTLS"
+  },
+  {
+    "given": "Dawid",
+    "family": "Kałędkowski",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: <https://orcid.org/0000-0001-9533-457X>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "runner"
+  },
+  {
+    "given": "Scott",
+    "family": "Chamberlain",
+    "email": null,
+    "role": "aut, cph",
+    "comment": "0000-0003-1444-9135",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rvertnet"
+  },
+  {
+    "given": "Dave",
+    "family": "Slager",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": "0000-0003-2525-2039",
+    "ORCID": null,
+    "ROR": null,
+    "package": "rvertnet"
+  },
+  {
+    "given": "Paolo",
+    "family": "Sonego",
+    "email": null,
+    "role": "aut, cph, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "RXKCD"
+  },
+  {
+    "given": "Alexander",
+    "family": "Murph",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "<https://orcid.org/0000-0001-7170-867X>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "sawnuti"
+  },
+  {
+    "given": "Guillermo",
+    "family": "Lopez-Taboada",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "scimetr"
+  },
+  {
+    "given": "Statistics Netherlands",
+    "family": null,
+    "email": null,
+    "role": "cph",
+    "comment": "microAggregation cpp code (under EUPL v1.1)",
+    "ORCID": null,
+    "ROR": null,
+    "package": "sdcMicro"
+  },
+  {
+    "given": "Jason Hsueh (Google Inc.)",
+    "family": null,
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "Files at src/third_party/protobuf-lite: google/protobuf/io/coded_stream_inl.h (BSD-3 License)",
+    "ORCID": null,
+    "ROR": null,
+    "package": "sentencepiece"
+  },
+  {
+    "given": "Peter",
+    "family": "Teunis",
+    "email": null,
+    "role": "aut, cph",
+    "comment": "Author of the method and original code.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "serocalculator"
+  },
+  {
+    "given": "Gregory",
+    "family": "Vaughan",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "sgee"
+  },
+  {
+    "given": "Silex Technologies",
+    "family": null,
+    "email": null,
+    "role": "fnd",
+    "comment": "https://www.silex-ip.com",
+    "ORCID": null,
+    "ROR": null,
+    "package": "shinybusy"
+  },
+  {
+    "given": "Thomas",
+    "family": "Farrar",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "0000-0003-0744-6972",
+    "ORCID": null,
+    "ROR": null,
+    "package": "skedastic"
+  },
+  {
+    "given": "Michel",
+    "family": "Lang",
+    "email": null,
+    "role": "rev",
+    "comment": "JOSS reviewer",
+    "ORCID": "0000-0001-9754-0393",
+    "ROR": null,
+    "package": "slurmR"
+  },
+  {
+    "given": "National Institutes of Health/National Institute on Aging",
+    "family": null,
+    "email": null,
+    "role": "fnd",
+    "comment": "The development of this software package was supported by a research grant from the National Institutes of Health/National Institute on Aging, (Principal Investigators: Jarrod E. Dalton, PhD and Adam T. Perzynski, PhD; Grant Number: 5R01AG055480-02). All of its contents are solely the responsibility of the authors and do not necessarily represent the official views of the NIH.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "sociome"
+  },
+  {
+    "given": "Ross",
+    "family": "Ihaka",
+    "email": null,
+    "role": "cph, ctb",
+    "comment": "Author of Mathlib.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "speakeasyR"
+  },
+  {
+    "given": "Luca",
+    "family": "Sartore",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID = \"0000-0002-0446-1328\"",
+    "ORCID": null,
+    "ROR": null,
+    "package": "spMC"
+  },
+  {
+    "given": "Dawid",
+    "family": "Kałędkowski",
+    "email": null,
+    "role": "aut, cre",
+    "comment": "ORCID: <https://orcid.org/0000-0001-9533-457X>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "sport"
+  },
+  {
+    "given": "Seb",
+    "family": "Dalgarno",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": "0000-0002-3658-4517",
+    "ROR": null,
+    "package": "ssdtools"
+  },
+  {
+    "given": "Alan",
+    "family": "Pearse",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0002-4133-8548",
+    "ROR": null,
+    "package": "SSNbler"
+  },
+  {
+    "given": "Sascha",
+    "family": "Meyen",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": "0000-0001-6928-4126",
+    "ROR": null,
+    "package": "statConfR"
+  },
+  {
+    "given": "Zoltan",
+    "family": "Herczeg",
+    "email": null,
+    "role": "ctb, cph",
+    "comment": "Bundled PCRE2 code",
+    "ORCID": null,
+    "ROR": null,
+    "package": "stringfish"
+  },
+  {
+    "given": "Troy",
+    "family": "Hernandez",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0009-0005-4248-604X",
+    "ROR": null,
+    "package": "subtitles"
+  },
+  {
+    "given": "Jessica",
+    "family": "Godwin",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "SUMMER"
+  },
+  {
+    "given": "Christoph",
+    "family": "Hofer",
+    "email": null,
+    "role": "cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "SwissAir"
+  },
+  {
+    "given": "Manuel",
+    "family": "Aristaran",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "tabulapdf"
+  },
+  {
+    "given": "Nathan",
+    "family": "Morris",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "tboot"
+  },
+  {
+    "given": "Youxiang",
+    "family": "Jiang",
+    "email": null,
+    "role": "cre, aut, ths",
+    "comment": "0000-0003-4557-5038",
+    "ORCID": null,
+    "ROR": null,
+    "package": "TestAnaAPP"
+  },
+  {
+    "given": "Hongbo",
+    "family": "Wen",
+    "email": null,
+    "role": "aut, ths",
+    "comment": "0000-0001-8620-9734",
+    "ORCID": null,
+    "ROR": null,
+    "package": "TestAnaAPP"
+  },
+  {
+    "given": "Liudas",
+    "family": "Giraitis",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "testcorr"
+  },
+  {
+    "given": "Jiacheng",
+    "family": "Wu",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "tfCox"
+  },
+  {
+    "given": "Gordon",
+    "family": "Kuzet",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "tmdbR"
+  },
+  {
+    "given": "Jan",
+    "family": "Altman",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "TRADER"
+  },
+  {
+    "given": "Amanda",
+    "family": "Dobbyn",
+    "email": null,
+    "role": "rev",
+    "comment": "reviewed a previous package that evolved into the current package for rOpenSci, see https://github.com/ropensci/onboarding/issues/217",
+    "ORCID": null,
+    "ROR": null,
+    "package": "tradestatistics"
+  },
+  {
+    "given": "Jorge",
+    "family": "Cimentada",
+    "email": null,
+    "role": "rev",
+    "comment": "reviewed a previous package that evolved into the current package for rOpenSci, see https://github.com/ropensci/onboarding/issues/217",
+    "ORCID": null,
+    "ROR": null,
+    "package": "tradestatistics"
+  },
+  {
+    "given": "Roonak",
+    "family": "Rezvani",
+    "email": null,
+    "role": "aut",
+    "comment": "Original package author",
+    "ORCID": "0000-0001-5580-5058",
+    "ROR": null,
+    "package": "TrialEmulation"
+  },
+  {
+    "given": "Peter",
+    "family": "Martin",
+    "email": null,
+    "role": "ctb",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "tv"
+  },
+  {
+    "given": "Dominik",
+    "family": "Schulz",
+    "email": null,
+    "role": "aut",
+    "comment": "Paderborn University, Germany",
+    "ORCID": null,
+    "ROR": null,
+    "package": "ufRisk"
+  },
+  {
+    "given": "Edzer",
+    "family": "Pebesma",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": "0000-0001-8049-7069",
+    "ROR": null,
+    "package": "units"
+  },
+  {
+    "given": "Avi",
+    "family": "Kenny",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "vaccine"
+  },
+  {
+    "given": "Melody",
+    "family": "Huang",
+    "email": null,
+    "role": "aut",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "vbm"
+  },
+  {
+    "given": "Gabriel",
+    "family": "Becker",
+    "email": null,
+    "role": "ctb",
+    "comment": "For developing the example ALTREP package vectorwindow that was foundational to this package.",
+    "ORCID": null,
+    "ROR": null,
+    "package": "vecrep"
+  },
+  {
+    "given": "David",
+    "family": "Gresham",
+    "email": null,
+    "role": "aut, cre, cph",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "vivaldi"
+  },
+  {
+    "given": "Alex",
+    "family": "Hallam",
+    "email": null,
+    "role": "aut, cre",
+    "comment": null,
+    "ORCID": null,
+    "ROR": null,
+    "package": "wodds"
+  },
+  {
+    "given": "Eric",
+    "family": "Brown",
+    "email": null,
+    "role": "rev",
+    "comment": "Eric reviewed the package for rOpenSci\n             , see <https://github.com/ropensci/software-review/issues/326/>",
+    "ORCID": null,
+    "ROR": null,
+    "package": "workloopR"
+  }
+]
