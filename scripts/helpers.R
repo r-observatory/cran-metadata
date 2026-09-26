@@ -236,3 +236,159 @@ write_deadlines <- function(con, pdb,
   closed   <- sum(!is.na(ch$updates$outcome))
   list(skipped = FALSE, new = nrow(ch$inserts), extended = extended, closed = closed)
 }
+
+# An ORCID iD not glued to further digits, and a ROR id as it follows ror.org/.
+ORCID_ID_PATTERN <- "(?<![0-9])[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X](?![0-9X])"
+ROR_ID_PATTERN   <- "0[a-hj-km-np-tv-z0-9]{6}[0-9]{2}"
+
+# ISO 7064 MOD 11-2, the check ORCID defines, so a mistyped iD never moves.
+orcid_checksum_ok <- function(id) {
+  vapply(id, function(one) {
+    if (is.na(one)) return(FALSE)
+    digits <- gsub("-", "", one, fixed = TRUE)
+    if (!grepl("^[0-9]{15}[0-9X]$", digits)) return(FALSE)
+    total <- 0
+    for (d in as.integer(strsplit(substr(digits, 1, 15), "")[[1]])) total <- (total + d) * 2
+    r <- (12 - total %% 11) %% 11
+    identical(if (r == 10) "X" else as.character(r), substr(digits, 16, 16))
+  }, logical(1), USE.NAMES = FALSE)
+}
+
+# One line per comment; a blank comment is stored as NULL, never as "".
+collapse_comment_whitespace <- function(x) {
+  x <- trimws(gsub("[[:space:]]+", " ", x, perl = TRUE))
+  x[!is.na(x) & !nzchar(x)] <- NA_character_
+  x
+}
+
+# Never truncates: the viewer reads review links from the full text. A comment
+# empties only when a moved identifier and its label were all it held.
+normalize_author_comments <- function(comment, orcid, ror_id) {
+  comment <- collapse_comment_whitespace(as.character(comment))
+  orcid   <- as.character(orcid)
+  ror_id  <- as.character(ror_id)
+  absent  <- function(v) is.na(v) || !nzchar(v)
+  orcid_hits <- regmatches(comment, gregexpr(ORCID_ID_PATTERN, comment, perl = TRUE))
+  ror_hits   <- regmatches(comment, gregexpr(
+    paste0("(?<![a-z0-9-])ror\\.org/", ROR_ID_PATTERN, "(?![a-z0-9])"), comment, perl = TRUE))
+  n_orcid <- 0L
+  n_ror   <- 0L
+  for (i in which(!is.na(comment))) {
+    rest  <- comment[i]
+    moved <- FALSE
+    # The same iD written twice is still one iD.
+    id <- unique(orcid_hits[[i]])
+    if (absent(orcid[i]) && length(id) == 1L && orcid_checksum_ok(id)) {
+      orcid[i] <- id
+      n_orcid  <- n_orcid + 1L
+      moved    <- TRUE
+      rest <- gsub(paste0("(?i)(orcid(\\s*id)?\\s*[:=]?\\s*)?[\"'<]?((https?://)?(www\\.)?orcid\\.org/)?",
+                          id, "[\"'>]?"), "", rest, perl = TRUE)
+    }
+    id <- unique(sub("^ror\\.org/", "", ror_hits[[i]]))
+    if (absent(ror_id[i]) && length(id) == 1L) {
+      ror_id[i] <- id
+      n_ror     <- n_ror + 1L
+      moved     <- TRUE
+      rest <- gsub(paste0("(?i)(ror(\\s*id)?\\s*[:=]?\\s*)?[\"'<]?(https?://)?(www\\.)?ror\\.org/",
+                          id, "[\"'>]?"), "", rest, perl = TRUE)
+    }
+    if (moved && grepl("^[[:punct:][:space:]]*$", rest)) comment[i] <- NA_character_
+  }
+  list(comment = comment, orcid = orcid, ror_id = ror_id,
+       n_orcid = n_orcid, n_ror = n_ror)
+}
+
+# Control characters other than tab, LF and CR break SQLite and downstream JSON.
+# The \\x{00} form keeps literal NUL bytes out of this file, which R cannot parse.
+sanitize_df <- function(df) {
+  for (col in names(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "",
+                         df[[col]], perl = TRUE)
+      df[[col]] <- iconv(df[[col]], to = "UTF-8", sub = "")
+    }
+  }
+  df
+}
+
+# An error while sanitizing or normalizing comments empties only comment, so the
+# other columns still land. `normalize` is replaceable so tests can force it.
+build_authors_df <- function(authors_df, normalize = normalize_author_comments) {
+  # Column names and list-vs-character types vary across R versions.
+  safe_col <- function(df, candidates) {
+    for (col in candidates) {
+      if (col %in% names(df)) {
+        vals <- df[[col]]
+        if (is.list(vals)) {
+          return(vapply(vals, function(v) {
+            if (is.null(v) || all(is.na(v))) NA_character_
+            else paste(as.character(v), collapse = ", ")
+          }, character(1)))
+        }
+        return(as.character(vals))
+      }
+    }
+    rep(NA_character_, nrow(df))
+  }
+
+  out <- data.frame(
+    package = safe_col(authors_df, c("Package", "package")),
+    given   = safe_col(authors_df, c("given", "Given")),
+    family  = safe_col(authors_df, c("family", "Family")),
+    email   = safe_col(authors_df, c("email", "Email")),
+    role    = safe_col(authors_df, c("role", "Role")),
+    orcid   = safe_col(authors_df, c("ORCID", "orcid")),
+    ror_id  = safe_col(authors_df, c("ROR_ID", "ror_id", "ROR")),
+    comment = safe_col(authors_df, c("comment", "Comment")),
+    stringsAsFactors = FALSE
+  )
+  out <- out[!is.na(out$package), , drop = FALSE]
+  rownames(out) <- NULL
+  others <- setdiff(names(out), "comment")
+  out[others] <- sanitize_df(out[others])
+
+  fixed <- tryCatch({
+    res <- normalize(sanitize_df(out["comment"])$comment, out$orcid, out$ror_id)
+    n <- nrow(out)
+    stopifnot(length(res$comment) == n, length(res$orcid) == n,
+              length(res$ror_id) == n)
+    res
+  }, error = function(e) {
+    cat("  WARN: author comments left empty after a normalization error:",
+        conditionMessage(e), "\n")
+    NULL
+  })
+
+  if (is.null(fixed)) {
+    out$comment <- rep(NA_character_, nrow(out))
+    attr(out, "recovered") <- c(orcid = 0L, ror = 0L)
+  } else {
+    out$comment <- fixed$comment
+    out$orcid   <- fixed$orcid
+    out$ror_id  <- fixed$ror_id
+    attr(out, "recovered") <- c(orcid = fixed$n_orcid, ror = fixed$n_ror)
+  }
+  out
+}
+
+# The table is rebuilt from CRAN every run, so a schema change needs no ALTER:
+# a prior metadata.db with the older columns is simply replaced.
+create_authors_table <- function(con) {
+  DBI::dbExecute(con, "DROP TABLE IF EXISTS authors")
+  DBI::dbExecute(con, "
+  CREATE TABLE authors (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    package TEXT NOT NULL,
+    given   TEXT,
+    family  TEXT,
+    email   TEXT,
+    role    TEXT,
+    orcid   TEXT,
+    ror_id  TEXT,
+    comment TEXT
+  )")
+  DBI::dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)")
+  DBI::dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
+  invisible(TRUE)
+}

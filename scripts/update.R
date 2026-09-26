@@ -41,25 +41,6 @@ invisible(dbExecute(con, "PRAGMA journal_mode=WAL"))
 invisible(dbExecute(con, "PRAGMA synchronous=NORMAL"))
 
 # ---------------------------------------------------------------------------
-# Text sanitization — CRAN data can contain NUL bytes, other control
-# characters, and non-UTF-8 encodings that break SQLite or downstream JSON.
-# Uses Perl \\x{00} syntax instead of literal \x00 escapes to avoid
-# embedding actual NUL bytes in the source file (which crashes R's parser).
-# ---------------------------------------------------------------------------
-sanitize_df <- function(df) {
-  for (col in names(df)) {
-    if (is.character(df[[col]])) {
-      # Strip NUL and other problematic control chars in one pass (keep \n \r \t)
-      df[[col]] <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "",
-                         df[[col]], perl = TRUE)
-      # Force valid UTF-8 (drop unrepresentable bytes)
-      df[[col]] <- iconv(df[[col]], to = "UTF-8", sub = "")
-    }
-  }
-  df
-}
-
-# ---------------------------------------------------------------------------
 # Extract diagnostic signal from CRAN check output, discarding build noise.
 # Returns the error/warning messages without compiler invocation lines,
 # make directory changes, or installation boilerplate.
@@ -426,52 +407,15 @@ tryCatch({
   authors_df <- as.data.frame(authors_raw)
   cat("  Fetched", nrow(authors_df), "rows\n")
 
-  invisible(dbExecute(con, "DROP TABLE IF EXISTS authors"))
-  invisible(dbExecute(con, "
-  CREATE TABLE authors (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    package TEXT NOT NULL,
-    given   TEXT,
-    family  TEXT,
-    email   TEXT,
-    role    TEXT,
-    orcid   TEXT,
-    ror_id  TEXT
-  )"))
-  invisible(dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)"))
-  invisible(dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)"))
+  create_authors_table(con)
 
-  # Build write data — handle columns that may not exist
-  safe_col <- function(df, candidates) {
-    for (col in candidates) {
-      if (col %in% names(df)) {
-        vals <- df[[col]]
-        if (is.list(vals)) {
-          return(vapply(vals, function(v) {
-            if (is.null(v) || all(is.na(v))) NA_character_
-            else paste(as.character(v), collapse = ", ")
-          }, character(1)))
-        }
-        return(as.character(vals))
-      }
-    }
-    rep(NA_character_, nrow(df))
-  }
-
-  write_df <- data.frame(
-    package = safe_col(authors_df, c("Package", "package")),
-    given   = safe_col(authors_df, c("given", "Given")),
-    family  = safe_col(authors_df, c("family", "Family")),
-    email   = safe_col(authors_df, c("email", "Email")),
-    role    = safe_col(authors_df, c("role", "Role")),
-    orcid   = safe_col(authors_df, c("ORCID", "orcid")),
-    ror_id  = safe_col(authors_df, c("ROR_ID", "ror_id", "ROR")),
-    stringsAsFactors = FALSE
-  )
-  write_df <- write_df[!is.na(write_df$package), ]
+  write_df <- build_authors_df(authors_df)
+  moved <- attr(write_df, "recovered")
   cat("  After filtering:", nrow(write_df), "rows\n")
+  cat("  Comments kept:", sum(!is.na(write_df$comment)),
+      "| ORCID iDs moved from comments:", moved[["orcid"]],
+      "| ROR ids moved from comments:", moved[["ror"]], "\n")
 
-  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "authors", write_df, append = TRUE)
   dbCommit(con)
