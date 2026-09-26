@@ -41,25 +41,6 @@ invisible(dbExecute(con, "PRAGMA journal_mode=WAL"))
 invisible(dbExecute(con, "PRAGMA synchronous=NORMAL"))
 
 # ---------------------------------------------------------------------------
-# Text sanitization — CRAN data can contain NUL bytes, other control
-# characters, and non-UTF-8 encodings that break SQLite or downstream JSON.
-# Uses Perl \\x{00} syntax instead of literal \x00 escapes to avoid
-# embedding actual NUL bytes in the source file (which crashes R's parser).
-# ---------------------------------------------------------------------------
-sanitize_df <- function(df) {
-  for (col in names(df)) {
-    if (is.character(df[[col]])) {
-      # Strip NUL and other problematic control chars in one pass (keep \n \r \t)
-      df[[col]] <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "",
-                         df[[col]], perl = TRUE)
-      # Force valid UTF-8 (drop unrepresentable bytes)
-      df[[col]] <- iconv(df[[col]], to = "UTF-8", sub = "")
-    }
-  }
-  df
-}
-
-# ---------------------------------------------------------------------------
 # Extract diagnostic signal from CRAN check output, discarding build noise.
 # Returns the error/warning messages without compiler invocation lines,
 # make directory changes, or installation boilerplate.

@@ -298,3 +298,76 @@ normalize_author_comments <- function(comment, orcid, ror_id) {
   list(comment = comment, orcid = orcid, ror_id = ror_id,
        n_orcid = n_orcid, n_ror = n_ror)
 }
+
+# Control characters other than tab, LF and CR break SQLite and downstream JSON.
+# The \\x{00} form keeps literal NUL bytes out of this file, which R cannot parse.
+sanitize_df <- function(df) {
+  for (col in names(df)) {
+    if (is.character(df[[col]])) {
+      df[[col]] <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "",
+                         df[[col]], perl = TRUE)
+      df[[col]] <- iconv(df[[col]], to = "UTF-8", sub = "")
+    }
+  }
+  df
+}
+
+# An error while sanitizing or normalizing comments empties only comment, so the
+# other columns still land. `normalize` is replaceable so tests can force it.
+build_authors_df <- function(authors_df, normalize = normalize_author_comments) {
+  # Column names and list-vs-character types vary across R versions.
+  safe_col <- function(df, candidates) {
+    for (col in candidates) {
+      if (col %in% names(df)) {
+        vals <- df[[col]]
+        if (is.list(vals)) {
+          return(vapply(vals, function(v) {
+            if (is.null(v) || all(is.na(v))) NA_character_
+            else paste(as.character(v), collapse = ", ")
+          }, character(1)))
+        }
+        return(as.character(vals))
+      }
+    }
+    rep(NA_character_, nrow(df))
+  }
+
+  out <- data.frame(
+    package = safe_col(authors_df, c("Package", "package")),
+    given   = safe_col(authors_df, c("given", "Given")),
+    family  = safe_col(authors_df, c("family", "Family")),
+    email   = safe_col(authors_df, c("email", "Email")),
+    role    = safe_col(authors_df, c("role", "Role")),
+    orcid   = safe_col(authors_df, c("ORCID", "orcid")),
+    ror_id  = safe_col(authors_df, c("ROR_ID", "ror_id", "ROR")),
+    comment = safe_col(authors_df, c("comment", "Comment")),
+    stringsAsFactors = FALSE
+  )
+  out <- out[!is.na(out$package), , drop = FALSE]
+  rownames(out) <- NULL
+  others <- setdiff(names(out), "comment")
+  out[others] <- sanitize_df(out[others])
+
+  fixed <- tryCatch({
+    res <- normalize(sanitize_df(out["comment"])$comment, out$orcid, out$ror_id)
+    n <- nrow(out)
+    stopifnot(length(res$comment) == n, length(res$orcid) == n,
+              length(res$ror_id) == n)
+    res
+  }, error = function(e) {
+    cat("  WARN: author comments left empty after a normalization error:",
+        conditionMessage(e), "\n")
+    NULL
+  })
+
+  if (is.null(fixed)) {
+    out$comment <- rep(NA_character_, nrow(out))
+    attr(out, "recovered") <- c(orcid = 0L, ror = 0L)
+  } else {
+    out$comment <- fixed$comment
+    out$orcid   <- fixed$orcid
+    out$ror_id  <- fixed$ror_id
+    attr(out, "recovered") <- c(orcid = fixed$n_orcid, ror = fixed$n_ror)
+  }
+  out
+}
