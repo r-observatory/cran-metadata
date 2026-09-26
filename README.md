@@ -165,9 +165,11 @@ Rebuilt each run. Author information from CRAN (`tools::CRAN_authors_db()`).
 | `role` | TEXT | Role (aut, cre, ctb, etc.) |
 | `orcid` | TEXT | ORCID identifier |
 | `ror_id` | TEXT | ROR identifier |
-| `comment` | TEXT | Free-text comment from the person entry, on one line and never truncated. NULL when there is none |
+| `comment` | TEXT | Free-text comment from the person entry, on one line and never truncated. NULL when CRAN recorded none, when it held nothing but an identifier moved out of it (see below), or on a run where the comment step failed |
 
-When `orcid` is empty and the comment holds exactly one distinct ORCID iD that passes its check digit, that iD is written to `orcid`. When `ror_id` is empty and the comment holds exactly one distinct `ror.org/` id, that id is written to `ror_id`. An identifier written twice counts once. A comment that held only the identifier (with an optional `ORCID:`, `ORCID iD:` or `ROR:` label, quotes, angle brackets or an `orcid.org/` or `ror.org/` URL prefix) is stored as NULL. Any other comment is kept whole, identifier included.
+When `orcid` is empty and the comment holds exactly one distinct ORCID iD that passes its check digit, that iD is written to `orcid`. When `ror_id` is empty and the comment holds exactly one distinct `ror.org/` id, that id is written to `ror_id`. An identifier written twice counts once. A comment that held nothing besides the identifiers moved out of it is stored as NULL. Around an identifier it may carry a label (`ORCID`, `ORCID iD`, `ROR` or `ROR ID`, in any letter case, followed by `:`, `=` or no separator), quotes, angle brackets, an `orcid.org/` or `ror.org/` prefix with or without `http://`, `https://` or `www.`, and any other punctuation or spaces. Any other comment is kept whole, identifier included.
+
+If cleaning or normalizing the comments fails on a run, that run stores `comment` as NULL on every row, keeps `orcid` and `ror_id` as CRAN gave them (nothing is moved that day), writes every other column as usual and logs one `WARN:` line in the Authors section. The same section's `Comments kept: N | ORCID iDs moved from comments: N | ROR ids moved from comments: N` line gives each run's counts.
 
 ### `packages_enrichment`
 
