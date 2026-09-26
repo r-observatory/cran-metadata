@@ -371,3 +371,24 @@ build_authors_df <- function(authors_df, normalize = normalize_author_comments) 
   }
   out
 }
+
+# The table is rebuilt from CRAN every run, so a schema change needs no ALTER:
+# a prior metadata.db with the older columns is simply replaced.
+create_authors_table <- function(con) {
+  DBI::dbExecute(con, "DROP TABLE IF EXISTS authors")
+  DBI::dbExecute(con, "
+  CREATE TABLE authors (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    package TEXT NOT NULL,
+    given   TEXT,
+    family  TEXT,
+    email   TEXT,
+    role    TEXT,
+    orcid   TEXT,
+    ror_id  TEXT,
+    comment TEXT
+  )")
+  DBI::dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)")
+  DBI::dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
+  invisible(TRUE)
+}
