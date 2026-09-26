@@ -236,3 +236,65 @@ write_deadlines <- function(con, pdb,
   closed   <- sum(!is.na(ch$updates$outcome))
   list(skipped = FALSE, new = nrow(ch$inserts), extended = extended, closed = closed)
 }
+
+# An ORCID iD not glued to further digits, and a ROR id as it follows ror.org/.
+ORCID_ID_PATTERN <- "(?<![0-9])[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X](?![0-9X])"
+ROR_ID_PATTERN   <- "0[a-hj-km-np-tv-z0-9]{6}[0-9]{2}"
+
+# ISO 7064 MOD 11-2, the check ORCID defines, so a mistyped iD never moves.
+orcid_checksum_ok <- function(id) {
+  vapply(id, function(one) {
+    if (is.na(one)) return(FALSE)
+    digits <- gsub("-", "", one, fixed = TRUE)
+    if (!grepl("^[0-9]{15}[0-9X]$", digits)) return(FALSE)
+    total <- 0
+    for (d in as.integer(strsplit(substr(digits, 1, 15), "")[[1]])) total <- (total + d) * 2
+    r <- (12 - total %% 11) %% 11
+    identical(if (r == 10) "X" else as.character(r), substr(digits, 16, 16))
+  }, logical(1), USE.NAMES = FALSE)
+}
+
+# One line per comment; a blank comment is stored as NULL, never as "".
+collapse_comment_whitespace <- function(x) {
+  x <- trimws(gsub("[[:space:]]+", " ", x, perl = TRUE))
+  x[!is.na(x) & !nzchar(x)] <- NA_character_
+  x
+}
+
+# Never truncates: the viewer reads review links from the full text. A comment
+# empties only when a moved identifier and its label were all it held.
+normalize_author_comments <- function(comment, orcid, ror_id) {
+  comment <- collapse_comment_whitespace(as.character(comment))
+  orcid   <- as.character(orcid)
+  ror_id  <- as.character(ror_id)
+  absent  <- function(v) is.na(v) || !nzchar(v)
+  orcid_hits <- regmatches(comment, gregexpr(ORCID_ID_PATTERN, comment, perl = TRUE))
+  ror_hits   <- regmatches(comment, gregexpr(
+    paste0("(?<![a-z0-9-])ror\\.org/", ROR_ID_PATTERN, "(?![a-z0-9])"), comment, perl = TRUE))
+  n_orcid <- 0L
+  n_ror   <- 0L
+  for (i in which(!is.na(comment))) {
+    rest  <- comment[i]
+    moved <- FALSE
+    # The same iD written twice is still one iD.
+    id <- unique(orcid_hits[[i]])
+    if (absent(orcid[i]) && length(id) == 1L && orcid_checksum_ok(id)) {
+      orcid[i] <- id
+      n_orcid  <- n_orcid + 1L
+      moved    <- TRUE
+      rest <- gsub(paste0("(?i)(orcid(\\s*id)?\\s*[:=]?\\s*)?[\"'<]?((https?://)?(www\\.)?orcid\\.org/)?",
+                          id, "[\"'>]?"), "", rest, perl = TRUE)
+    }
+    id <- unique(sub("^ror\\.org/", "", ror_hits[[i]]))
+    if (absent(ror_id[i]) && length(id) == 1L) {
+      ror_id[i] <- id
+      n_ror     <- n_ror + 1L
+      moved     <- TRUE
+      rest <- gsub(paste0("(?i)(ror(\\s*id)?\\s*[:=]?\\s*)?[\"'<]?(https?://)?(www\\.)?ror\\.org/",
+                          id, "[\"'>]?"), "", rest, perl = TRUE)
+    }
+    if (moved && grepl("^[[:punct:][:space:]]*$", rest)) comment[i] <- NA_character_
+  }
+  list(comment = comment, orcid = orcid, ror_id = ror_id,
+       n_orcid = n_orcid, n_ror = n_ror)
+}
