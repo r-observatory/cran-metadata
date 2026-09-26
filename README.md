@@ -153,7 +153,7 @@ Rebuilt each run. Known check issues per package.
 
 ### `authors`
 
-Rebuilt each run. Author information from CRAN.
+Rebuilt each run. Author information from CRAN (`tools::CRAN_authors_db()`).
 
 | Column | Type | Description |
 |---|---|---|
@@ -165,6 +165,9 @@ Rebuilt each run. Author information from CRAN.
 | `role` | TEXT | Role (aut, cre, ctb, etc.) |
 | `orcid` | TEXT | ORCID identifier |
 | `ror_id` | TEXT | ROR identifier |
+| `comment` | TEXT | Free-text comment from the person entry, on one line and never truncated. NULL when there is none |
+
+When `orcid` is empty and the comment holds exactly one distinct ORCID iD that passes its check digit, that iD is written to `orcid`. When `ror_id` is empty and the comment holds exactly one distinct `ror.org/` id, that id is written to `ror_id`. An identifier written twice counts once. A comment that held only the identifier (with an optional `ORCID:`, `ORCID iD:` or `ROR:` label, quotes, angle brackets or an `orcid.org/` or `ror.org/` URL prefix) is stored as NULL. Any other comment is kept whole, identifier included.
 
 ### `packages_enrichment`
 
