@@ -58,6 +58,13 @@ test_that("Windows and old Mac line breaks in a comment become single spaces", {
   expect_identical(out$comment[1], "Maintainer since 2020, retired 2025")
 })
 
+test_that("control characters in a comment are removed before it is stored", {
+  a <- .cran_authors()
+  a$comment[1] <- "Maintainer\x01 since\x1f 2020"
+  out <- build_authors_df(a)
+  expect_identical(out$comment[1], "Maintainer since 2020")
+})
+
 test_that("an empty CRAN author database gives an empty frame with every column", {
   out <- build_authors_df(.cran_authors()[0, ])
   expect_identical(nrow(out), 0L)
