@@ -46,9 +46,21 @@ test_that("named rows of the CRAN extract read as expected", {
     expect_identical(out$comment[i], "0000-0003-4930-3582")
   }
   i <- .row(out, "doclisting", "Posit Software, PBC")
-  expect_identical(out$ror_id[i], "https://ror.org/03wc8by49")
+  expect_identical(out$ror_id[i], "03wc8by49")
+  i <- .row(out, "DiversityStats", "ICAR-NBGPR")
+  expect_identical(out$ror_id[i], "00scbd467")
   i <- .row(out, "AirportProblems", "Miguel \u00c1ngel")
   expect_identical(out$comment[i], "RGEAF. Departamento de Matem\u00e1ticas. Universidade de Vigo. Spain")
+})
+
+test_that("the two URL-form ROR ids in the CRAN extract are stored bare", {
+  raw <- .extract()
+  expect_identical(sum(grepl("^https://ror\\.org/", raw$ROR)), 2L)
+  out <- build_authors_df(raw)
+  ids <- out$ror_id[!is.na(out$ror_id)]
+  expect_identical(length(ids), 3L)
+  expect_true(all(grepl(paste0("^", ROR_ID_PATTERN, "$"), ids)))
+  expect_identical(attr(out, "ror_ids_reduced"), 2L)
 })
 
 test_that("review links past character 120 survive whole", {
