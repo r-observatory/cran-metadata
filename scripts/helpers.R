@@ -312,6 +312,16 @@ sanitize_df <- function(df) {
   df
 }
 
+# CRAN gives some ROR ids as https://ror.org/<id>. Only a value that reduces to
+# the bare id changes; anything else is returned as given.
+normalize_ror_id <- function(x) {
+  x <- as.character(x)
+  bare <- sub("/$", "", sub("^(?i)(https?://)?(www\\.)?ror\\.org/", "", trimws(x), perl = TRUE))
+  ok <- !is.na(x) & grepl(paste0("^", ROR_ID_PATTERN, "$"), bare, perl = TRUE)
+  x[ok] <- bare[ok]
+  x
+}
+
 # An error while sanitizing or normalizing comments empties only comment, so the
 # other columns still land. `normalize` is replaceable so tests can force it.
 build_authors_df <- function(authors_df, normalize = normalize_author_comments) {
@@ -348,6 +358,19 @@ build_authors_df <- function(authors_df, normalize = normalize_author_comments) 
   others <- setdiff(names(out), "comment")
   out[others] <- sanitize_df(out[others])
 
+  given_ror  <- out$ror_id
+  out$ror_id <- normalize_ror_id(given_ror)
+  n_reduced  <- sum(!is.na(given_ror) & given_ror != out$ror_id)
+  odd <- which(!is.na(out$ror_id) & nzchar(out$ror_id) &
+               !grepl(paste0("^", ROR_ID_PATTERN, "$"), out$ror_id, perl = TRUE))
+  if (length(odd) > 0) {
+    shown <- head(odd, 10)
+    cat("  WARN:", length(odd), if (length(odd) == 1L) "ror_id value" else "ror_id values",
+        "kept as given, not a ROR id:",
+        paste0(out$package[shown], ": ", out$ror_id[shown], collapse = "; "),
+        if (length(odd) > length(shown)) "; ..." else "", "\n")
+  }
+
   fixed <- tryCatch({
     res <- normalize(sanitize_df(out["comment"])$comment, out$orcid, out$ror_id)
     n <- nrow(out)
@@ -369,6 +392,7 @@ build_authors_df <- function(authors_df, normalize = normalize_author_comments) 
     out$ror_id  <- fixed$ror_id
     attr(out, "recovered") <- c(orcid = fixed$n_orcid, ror = fixed$n_ror)
   }
+  attr(out, "ror_ids_reduced") <- n_reduced
   out
 }
 

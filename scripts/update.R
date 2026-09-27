@@ -414,7 +414,8 @@ tryCatch({
   cat("  After filtering:", nrow(write_df), "rows\n")
   cat("  Comments kept:", sum(!is.na(write_df$comment)),
       "| ORCID iDs moved from comments:", moved[["orcid"]],
-      "| ROR ids moved from comments:", moved[["ror"]], "\n")
+      "| ROR ids moved from comments:", moved[["ror"]],
+      "| ROR URLs reduced to the bare id:", attr(write_df, "ror_ids_reduced"), "\n")
 
   dbBegin(con)
   dbWriteTable(con, "authors", write_df, append = TRUE)
