@@ -416,3 +416,69 @@ create_authors_table <- function(con) {
   DBI::dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
   invisible(TRUE)
 }
+
+# Tables that carry state from run to run and cannot be rebuilt from CRAN.
+STATE_TABLES <- c("check_status_history", "cran_check_deadlines", "cran_maintainer_bounces",
+                  "cran_check_flavor_status_history", "cran_check_flavors")
+
+# NULL when the prior release published no manifest; an error when it did but
+# the file cannot be parsed.
+read_prior_manifest <- function(path) {
+  if (!file.exists(path)) return(NULL)
+  jsonlite::fromJSON(path, simplifyVector = FALSE)
+}
+
+# The row counts a prior manifest promises for state tables: its state_tables
+# key, or, for a manifest written before that key existed, the state tables
+# among its tables.
+prior_state_listing <- function(manifest) {
+  if (is.null(manifest)) return(setNames(integer(0), character(0)))
+  listed <- manifest$state_tables
+  if (is.null(listed)) {
+    listed <- manifest$tables
+    listed <- listed[intersect(names(listed), STATE_TABLES)]
+  }
+  if (length(listed) == 0) return(setNames(integer(0), character(0)))
+  setNames(as.integer(unlist(listed)), names(listed))
+}
+
+# Opens the downloaded metadata.db read-only and reads every state table in
+# full, so a NUL byte or a damaged page shows up here and not halfway through
+# update.R. ok is FALSE on any error, a listed table missing, or fewer rows
+# than the prior manifest listed.
+validate_prior_db <- function(path, manifest = NULL) {
+  problems <- character(0)
+  counts <- setNames(integer(0), character(0))
+  listed <- prior_state_listing(manifest)
+  con <- tryCatch(DBI::dbConnect(RSQLite::SQLite(), path, flags = RSQLite::SQLITE_RO,
+                                 synchronous = NULL),
+                  error = function(e) { problems <<- c(problems, conditionMessage(e)); NULL })
+  if (!is.null(con)) {
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    tryCatch({
+      qc <- DBI::dbGetQuery(con, "PRAGMA quick_check")[[1]]
+      if (!identical(qc, "ok")) problems <- c(problems, paste("quick_check:", paste(qc, collapse = "; ")))
+      present <- DBI::dbListTables(con)
+      for (t in union(intersect(STATE_TABLES, present), names(listed))) {
+        if (!t %in% present) {
+          problems <- c(problems, sprintf("%s is listed with %d rows but missing", t, listed[[t]]))
+          next
+        }
+        n <- nrow(DBI::dbGetQuery(con, sprintf('SELECT * FROM "%s"', t)))
+        counts[[t]] <- n
+        if (t %in% names(listed) && n < listed[[t]]) {
+          problems <- c(problems, sprintf("%s has %d rows, the prior manifest listed %d", t, n, listed[[t]]))
+        }
+      }
+    }, error = function(e) problems <<- c(problems, conditionMessage(e)))
+  }
+  list(ok = length(problems) == 0, problems = problems, counts = counts)
+}
+
+# What the validation step does with the downloaded db. start_fresh discards
+# only a db that failed validation; a readable one is always kept.
+prior_db_action <- function(valid, start_fresh = FALSE) {
+  if (isTRUE(valid)) return("keep")
+  if (isTRUE(start_fresh)) return("discard")
+  "fail"
+}
