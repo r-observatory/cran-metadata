@@ -589,3 +589,111 @@ check_detail_entry <- function(flavor, status, check_name, output, version = NUL
   sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s","version":"%s","flags":"%s"}',
           s(flavor), s(status), s(check_name), s(output), s(version), s(flags))
 }
+
+# Decide whether today's Bounce column is fit to diff. A missing column or
+# fewer than 99% of rows reading "yes" or "no" is a changed or broken source;
+# with 20 or more open episodes, an empty or halved flagged set is too.
+bounce_snapshot_healthy <- function(snapshot_n, prior_open_n, has_col, valid_share,
+                                    drop_frac_max = 0.5, min_prior = 20L,
+                                    min_valid_share = 0.99) {
+  if (!isTRUE(has_col)) return(FALSE)
+  if (is.na(valid_share) || valid_share < min_valid_share) return(FALSE)
+  if (prior_open_n < min_prior) return(TRUE)
+  if (snapshot_n == 0L) return(FALSE)
+  if ((prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
+  TRUE
+}
+
+# Diff today's flagged packages against the open bounce episodes. Flagged and
+# open extends last_seen; flagged and not open opens max+1; open and no longer
+# flagged closes as 'cleared' when the package is still on CRAN, else
+# 'vanished', leaving last_seen where it was.
+compute_bounce_changes <- function(prior_open, flagged, current_packages, max_seq_map,
+                                   version_map, today, onset_known) {
+  flagged <- unique(flagged)
+  new_pkgs <- setdiff(flagged, prior_open$package)
+  n_new <- length(new_pkgs)
+  seq_next <- ifelse(is.na(max_seq_map[new_pkgs]), 1L, as.integer(max_seq_map[new_pkgs]) + 1L)
+  inserts <- data.frame(
+    package = new_pkgs, episode_seq = as.integer(seq_next),
+    version = unname(as.character(version_map[new_pkgs])),
+    onset_known = rep(as.integer(onset_known), n_new),
+    first_seen = rep(today, n_new), last_seen = rep(today, n_new),
+    resolved_on = rep(NA_character_, n_new), outcome = rep(NA_character_, n_new),
+    archived_on = rep(NA_character_, n_new), stringsAsFactors = FALSE)
+  still <- prior_open$package %in% flagged
+  kept <- prior_open[still, , drop = FALSE]
+  gone <- prior_open[!still, , drop = FALSE]
+  updates <- rbind(
+    data.frame(last_seen = rep(today, nrow(kept)), resolved_on = rep(NA_character_, nrow(kept)),
+               outcome = rep(NA_character_, nrow(kept)), package = kept$package,
+               episode_seq = as.integer(kept$episode_seq), stringsAsFactors = FALSE),
+    data.frame(last_seen = gone$last_seen, resolved_on = rep(today, nrow(gone)),
+               outcome = ifelse(gone$package %in% current_packages, "cleared", "vanished"),
+               package = gone$package, episode_seq = as.integer(gone$episode_seq),
+               stringsAsFactors = FALSE))
+  list(inserts = inserts, updates = updates)
+}
+
+# Sole author of cran_maintainer_bounces. Onsets opened by the run that creates
+# the table are unknown (onset_known = 0); an unhealthy first snapshot creates
+# nothing, so the next healthy run still records them as unknown.
+write_bounces <- function(con, pdb, today = as.character(Sys.Date())) {
+  existed <- DBI::dbExistsTable(con, "cran_maintainer_bounces")
+  if (existed) {
+    prior_open <- DBI::dbGetQuery(con, "SELECT package, episode_seq, last_seen
+      FROM cran_maintainer_bounces WHERE resolved_on IS NULL")
+    ms <- DBI::dbGetQuery(con, "SELECT package, MAX(episode_seq) AS max_seq
+      FROM cran_maintainer_bounces GROUP BY package")
+  } else {
+    prior_open <- data.frame(package = character(0), episode_seq = integer(0),
+                             last_seen = character(0), stringsAsFactors = FALSE)
+    ms <- data.frame(package = character(0), max_seq = integer(0), stringsAsFactors = FALSE)
+  }
+  has_col <- is.data.frame(pdb) && all(c("Package", "Bounce") %in% names(pdb))
+  if (has_col) {
+    pdb <- pdb[!is.na(pdb$Package) & !duplicated(pdb$Package), , drop = FALSE]
+    b <- tolower(trimws(as.character(pdb$Bounce)))
+    valid_share <- if (nrow(pdb) > 0) mean(!is.na(b) & b %in% c("yes", "no")) else NA_real_
+    flagged <- pdb$Package[!is.na(b) & b == "yes"]
+  } else {
+    valid_share <- NA_real_
+    flagged <- character(0)
+  }
+  if (!bounce_snapshot_healthy(length(flagged), nrow(prior_open), has_col, valid_share)) {
+    return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
+  }
+
+  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_maintainer_bounces (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL,
+    version TEXT,
+    onset_known INTEGER NOT NULL,
+    first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT,
+    archived_on TEXT,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_maintainer_bounces_open
+    ON cran_maintainer_bounces(package) WHERE resolved_on IS NULL")
+
+  max_seq_map <- if (nrow(ms)) setNames(ms$max_seq, ms$package) else setNames(integer(0), character(0))
+  version_map <- setNames(as.character(pdb$Version), pdb$Package)
+  ch <- compute_bounce_changes(prior_open, flagged, pdb$Package, max_seq_map, version_map,
+                               today, onset_known = if (existed) 1L else 0L)
+
+  DBI::dbBegin(con)
+  ok <- FALSE
+  on.exit(if (!ok) tryCatch(DBI::dbRollback(con), error = function(e) NULL), add = TRUE)
+  if (nrow(ch$inserts) > 0) DBI::dbWriteTable(con, "cran_maintainer_bounces", ch$inserts, append = TRUE)
+  if (nrow(ch$updates) > 0) {
+    DBI::dbExecute(con, "UPDATE cran_maintainer_bounces SET last_seen = ?, resolved_on = ?,
+      outcome = ? WHERE package = ? AND episode_seq = ?",
+      params = list(ch$updates$last_seen, ch$updates$resolved_on, ch$updates$outcome,
+                    ch$updates$package, ch$updates$episode_seq))
+  }
+  DBI::dbCommit(con); ok <- TRUE
+  list(skipped = FALSE, new = nrow(ch$inserts), extended = sum(is.na(ch$updates$outcome)),
+       closed = sum(!is.na(ch$updates$outcome)))
+}
