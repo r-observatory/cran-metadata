@@ -150,7 +150,7 @@ Rebuilt each run. Known check issues per package.
 | `package` | TEXT | Package name |
 | `status` | TEXT | Worst status across all flavors |
 | `flavor_summary` | TEXT | JSON object with status counts, e.g. `{"OK":12,"NOTE":1}` |
-| `details` | TEXT | JSON array of non-OK entries with flavor, status, check_name, output, version and flags (the last two are empty strings on rows written before they were recorded) |
+| `details` | TEXT | JSON array of non-OK entries with flavor, status, check_name, output, version and flags. Rows written before version and flags were recorded have neither key. On later rows a value CRAN leaves blank is an empty string |
 | `detected_at` | TEXT | ISO 8601 timestamp when the change was detected |
 
 ### `cran_check_deadlines`
