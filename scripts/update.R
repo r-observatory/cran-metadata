@@ -23,6 +23,17 @@ db_path <- if (length(args) >= 1) args[1] else "metadata.db"
 
 cat("Database path:", db_path, "\n")
 
+# A prior release with no db on disk is a failed download unless the validation
+# step discarded the db on a start_fresh dispatch (COLD_START=true).
+startup <- startup_state(file.exists(db_path),
+                         file.exists(file.path(dirname(db_path), "prior-tag.txt")),
+                         identical(Sys.getenv("COLD_START"), "true"))
+if (!is.null(startup$error)) stop(startup$error)
+cold_start <- startup$cold_start
+prior_manifest <- if (cold_start) NULL else
+  read_prior_manifest(file.path(dirname(db_path), "prior-manifest.json"))
+if (cold_start) cat("Cold start: no prior metadata.db carried into this run\n")
+
 # ---------------------------------------------------------------------------
 # Connect and configure SQLite
 # ---------------------------------------------------------------------------
@@ -83,19 +94,6 @@ extract_check_signal_vec <- function(outputs, max_chars = 2000L) {
 }
 
 # ---------------------------------------------------------------------------
-# JSON escape helper
-# ---------------------------------------------------------------------------
-json_escape <- function(s) {
-  s <- gsub("\\\\", "\\\\\\\\", s)
-  s <- gsub('"', '\\\\"', s)
-  s <- gsub("\n", "\\\\n", s)
-  s <- gsub("\t", "\\\\t", s)
-  s <- gsub("\r", "\\\\r", s)
-  s <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "", s, perl = TRUE)
-  s
-}
-
-# ---------------------------------------------------------------------------
 # Create append-only table (never dropped)
 # ---------------------------------------------------------------------------
 invisible(dbExecute(con, "
@@ -138,32 +136,10 @@ tryCatch({
   results_df <- tools::CRAN_check_results()
   cat("  Fetched", nrow(results_df), "rows\n")
 
-  invisible(dbExecute(con, "DROP TABLE IF EXISTS cran_check_results"))
-  invisible(dbExecute(con, "
-  CREATE TABLE cran_check_results (
-    package  TEXT NOT NULL,
-    flavor   TEXT NOT NULL,
-    status   TEXT NOT NULL,
-    tinstall REAL,
-    tcheck   REAL,
-    ttotal   REAL,
-    PRIMARY KEY (package, flavor)
-  )"))
-  invisible(dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)"))
-
-  write_df <- data.frame(
-    package  = results_df$Package,
-    flavor   = results_df$Flavor,
-    status   = results_df$Status,
-    tinstall = as.numeric(results_df$T_install),
-    tcheck   = as.numeric(results_df$T_check),
-    ttotal   = as.numeric(results_df$T_total),
-    stringsAsFactors = FALSE
-  )
-  write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$flavor) & !is.na(write_df$status), ]
+  create_check_results_table(con)
+  write_df <- build_check_results_df(results_df)
   cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
-  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "cran_check_results", write_df, append = TRUE)
   dbCommit(con)
@@ -295,9 +271,7 @@ tryCatch({
           }
         }
         if (is.na(out)) out <- ""
-        sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s"}',
-                json_escape(flav), json_escape(stat),
-                json_escape(chk), json_escape(out))
+        check_detail_entry(flav, stat, chk, out, non_ok$Version[j], non_ok$Flags[j])
       }, character(1))
       details_json[i] <- paste0("[", paste(entries, collapse = ","), "]")
     }
@@ -480,6 +454,28 @@ tryCatch({
     counts$deadlines_extended <- res$extended
     counts$deadlines_closed <- res$closed
     cat("  Deadlines: ", res$new, " new, ", res$extended, " extended, ", res$closed, " closed\n", sep = "")
+  }
+}, error = function(e) {
+  cat("  ERROR:", e$message, "\n")
+  tryCatch(dbRollback(con), error = function(e2) NULL)
+})
+
+# =========================================================================
+# 6c. CRAN maintainer bounces (CRAN's email to the maintainer bounces)
+# =========================================================================
+cat("\n=== 6c. CRAN Maintainer Bounces ===\n")
+counts$bounces_new <- 0L
+counts$bounces_extended <- 0L
+counts$bounces_closed <- 0L
+tryCatch({
+  res <- write_bounces(con, pdb, today = as.character(Sys.Date()))
+  if (isTRUE(res$skipped)) {
+    cat("  Skipped: Bounce snapshot failed the health check (prior rows preserved)\n")
+  } else {
+    counts$bounces_new <- res$new
+    counts$bounces_extended <- res$extended
+    counts$bounces_closed <- res$closed
+    cat("  Bounces: ", res$new, " new, ", res$extended, " extended, ", res$closed, " closed\n", sep = "")
   }
 }, error = function(e) {
   cat("  ERROR:", e$message, "\n")
@@ -673,6 +669,8 @@ history_total <- tryCatch(
 notes <- paste0(
   "## CRAN Metadata Update\n\n",
   "**", format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC"), "**\n\n",
+  if (cold_start) paste0("**Cold start:** no prior metadata.db was carried into this run, ",
+                         "so every episode opened today has an unknown onset.\n\n") else "",
   "| Table | Rows |\n",
   "|-------|------|\n",
   "| cran_check_results | ", counts$check_results, " |\n",
@@ -687,6 +685,9 @@ notes <- paste0(
   "| cran_check_deadlines (new) | ", counts$deadlines_new, " |\n",
   "| cran_check_deadlines (extended) | ", counts$deadlines_extended, " |\n",
   "| cran_check_deadlines (closed) | ", counts$deadlines_closed, " |\n",
+  "| cran_maintainer_bounces (new) | ", counts$bounces_new, " |\n",
+  "| cran_maintainer_bounces (extended) | ", counts$bounces_extended, " |\n",
+  "| cran_maintainer_bounces (closed) | ", counts$bounces_closed, " |\n",
   "| **Database size** | ", db_size, " |\n"
 )
 
@@ -710,6 +711,13 @@ finalize_db()
 # tracks full-not-partial; freshness is tracked separately via the manifest
 # generated_at timestamp and the db_sha256 fingerprint.
 core <- summary_integrity_core(db_path, complete = FALSE)
+core$state_tables <- state_table_counts(core$tables)
+core$cold_start <- cold_start
+shrunk <- if (cold_start) character(0) else state_tables_shrunk(core$state_tables, prior_manifest)
+if (length(shrunk) > 0) {
+  for (line in shrunk) cat("::error::", line, "\n", sep = "")
+  stop("state tables lost rows since the prior release; not publishing")
+}
 manifest_path <- file.path(dirname(db_path), MANIFEST_FILENAME)
 write_manifest(manifest_path, core)
 cat("Wrote", manifest_path, "\n")

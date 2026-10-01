@@ -169,28 +169,25 @@ compute_deadline_changes <- function(prior_open, snapshot, current_packages,
 #' updates in one transaction. Skips the diff (preserving prior rows) when the
 #' snapshot fails the no-data floor. `worst_status_map` is the same in-memory
 #' worst-check-status vector update.R computes for check_status_history.
+#' Episodes opened by the run that creates the table get onset_known = 0, and
+#' an unhealthy first snapshot creates nothing, so that stays true.
 write_deadlines <- function(con, pdb,
                             worst_status_map = setNames(character(0), character(0)),
                             today = as.character(Sys.Date()),
                             drop_frac_max = 0.5) {
-  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
-    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
-    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
-    resolved_on TEXT, outcome TEXT, archived_on TEXT,
-    PRIMARY KEY (package, episode_seq),
-    CHECK (resolved_on IS NULL OR resolved_on <> ''),
-    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
-    CHECK (last_seen >= first_seen))")
-  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_check_deadlines_open
-    ON cran_check_deadlines(package) WHERE resolved_on IS NULL")
-  DBI::dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_ccd_open_deadline
-    ON cran_check_deadlines(deadline) WHERE resolved_on IS NULL")
-
-  prior_open <- DBI::dbGetQuery(con,
-    "SELECT package, episode_seq, deadline, last_seen
-       FROM cran_check_deadlines WHERE resolved_on IS NULL")
-  ms <- DBI::dbGetQuery(con,
-    "SELECT package, MAX(episode_seq) AS max_seq FROM cran_check_deadlines GROUP BY package")
+  existed <- DBI::dbExistsTable(con, "cran_check_deadlines")
+  if (existed) {
+    prior_open <- DBI::dbGetQuery(con,
+      "SELECT package, episode_seq, deadline, last_seen
+         FROM cran_check_deadlines WHERE resolved_on IS NULL")
+    ms <- DBI::dbGetQuery(con,
+      "SELECT package, MAX(episode_seq) AS max_seq FROM cran_check_deadlines GROUP BY package")
+  } else {
+    prior_open <- data.frame(package = character(0), episode_seq = integer(0),
+                             deadline = character(0), last_seen = character(0),
+                             stringsAsFactors = FALSE)
+    ms <- data.frame(package = character(0), max_seq = integer(0), stringsAsFactors = FALSE)
+  }
   max_seq_map <- if (nrow(ms)) setNames(ms$max_seq, ms$package) else setNames(integer(0), character(0))
 
   has_col <- is.data.frame(pdb) && "Deadline" %in% names(pdb)
@@ -216,8 +213,26 @@ write_deadlines <- function(con, pdb,
     return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
   }
 
+  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
+    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT, archived_on TEXT, onset_known INTEGER,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  # Rows from before the column existed keep NULL: their onset was not recorded.
+  if (!"onset_known" %in% DBI::dbListFields(con, "cran_check_deadlines")) {
+    DBI::dbExecute(con, "ALTER TABLE cran_check_deadlines ADD COLUMN onset_known INTEGER")
+  }
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_check_deadlines_open
+    ON cran_check_deadlines(package) WHERE resolved_on IS NULL")
+  DBI::dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_ccd_open_deadline
+    ON cran_check_deadlines(deadline) WHERE resolved_on IS NULL")
+
   ch <- compute_deadline_changes(prior_open, snapshot, current_packages,
                                  worst_status_map, max_seq_map, today)
+  ch$inserts$onset_known <- rep(if (existed) 1L else 0L, nrow(ch$inserts))
 
   DBI::dbBegin(con)
   ok <- FALSE
@@ -415,4 +430,271 @@ create_authors_table <- function(con) {
   DBI::dbExecute(con, "CREATE INDEX idx_authors_package ON authors (package)")
   DBI::dbExecute(con, "CREATE INDEX idx_authors_name    ON authors (family, given)")
   invisible(TRUE)
+}
+
+# Tables that carry state from run to run and cannot be rebuilt from CRAN.
+STATE_TABLES <- c("check_status_history", "cran_check_deadlines", "cran_maintainer_bounces",
+                  "cran_check_flavor_status_history", "cran_check_flavors")
+
+# NULL when the prior release published no manifest; an error when it did but
+# the file cannot be parsed.
+read_prior_manifest <- function(path) {
+  if (!file.exists(path)) return(NULL)
+  jsonlite::fromJSON(path, simplifyVector = FALSE)
+}
+
+# The row counts a prior manifest promises for state tables: its state_tables
+# key, or, for a manifest written before that key existed, the state tables
+# among its tables.
+prior_state_listing <- function(manifest) {
+  if (is.null(manifest)) return(setNames(integer(0), character(0)))
+  listed <- manifest$state_tables
+  if (is.null(listed)) {
+    listed <- manifest$tables
+    listed <- listed[intersect(names(listed), STATE_TABLES)]
+  }
+  if (length(listed) == 0) return(setNames(integer(0), character(0)))
+  setNames(as.integer(unlist(listed)), names(listed))
+}
+
+# Opens the downloaded metadata.db read-only, runs PRAGMA quick_check, reads
+# every state table in full and compares its row count with the prior
+# manifest. ok is FALSE on any error, a quick_check result other than ok, a
+# listed table missing, or fewer rows than the prior manifest listed.
+validate_prior_db <- function(path, manifest = NULL) {
+  problems <- character(0)
+  counts <- setNames(integer(0), character(0))
+  listed <- prior_state_listing(manifest)
+  con <- tryCatch(DBI::dbConnect(RSQLite::SQLite(), path, flags = RSQLite::SQLITE_RO,
+                                 synchronous = NULL),
+                  error = function(e) { problems <<- c(problems, conditionMessage(e)); NULL })
+  if (!is.null(con)) {
+    on.exit(DBI::dbDisconnect(con), add = TRUE)
+    tryCatch({
+      qc <- DBI::dbGetQuery(con, "PRAGMA quick_check")[[1]]
+      if (!identical(qc, "ok")) problems <- c(problems, paste("quick_check:", paste(qc, collapse = "; ")))
+      present <- DBI::dbListTables(con)
+      for (t in union(intersect(STATE_TABLES, present), names(listed))) {
+        if (!t %in% present) {
+          problems <- c(problems, sprintf("%s is listed with %d rows but missing", t, listed[[t]]))
+          next
+        }
+        n <- nrow(DBI::dbGetQuery(con, sprintf('SELECT * FROM "%s"', t)))
+        counts[[t]] <- n
+        if (t %in% names(listed) && n < listed[[t]]) {
+          problems <- c(problems, sprintf("%s has %d rows, the prior manifest listed %d", t, n, listed[[t]]))
+        }
+      }
+    }, error = function(e) problems <<- c(problems, conditionMessage(e)))
+  }
+  list(ok = length(problems) == 0, problems = problems, counts = counts)
+}
+
+# What the validation step does with the downloaded db. One that passed is
+# kept. One that did not pass, which includes one whose manifest could not be
+# parsed, is discarded under start_fresh and fails the step otherwise.
+prior_db_action <- function(valid, start_fresh = FALSE) {
+  if (isTRUE(valid)) return("keep")
+  if (isTRUE(start_fresh)) return("discard")
+  "fail"
+}
+
+# How update.R starts. No db on disk is a cold start; when a prior release
+# exists that is only allowed after the validation step discarded it.
+startup_state <- function(db_exists, prior_release_exists, declared_cold) {
+  if (isTRUE(db_exists)) return(list(cold_start = FALSE, error = NULL))
+  if (isTRUE(prior_release_exists) && !isTRUE(declared_cold)) {
+    return(list(cold_start = TRUE,
+                error = "a prior release exists but no metadata.db was downloaded"))
+  }
+  list(cold_start = TRUE, error = NULL)
+}
+
+# The state tables among a manifest's table counts, as a JSON object.
+state_table_counts <- function(tables) {
+  keep <- intersect(STATE_TABLES, names(tables))
+  setNames(lapply(keep, function(t) as.integer(tables[[t]])), keep)
+}
+
+# One line per state table with fewer rows than the prior manifest listed.
+state_tables_shrunk <- function(current, prior_manifest) {
+  listed <- prior_state_listing(prior_manifest)
+  out <- character(0)
+  for (t in names(listed)) {
+    n <- if (t %in% names(current)) as.integer(current[[t]]) else 0L
+    if (n < listed[[t]]) {
+      out <- c(out, sprintf("%s has %d rows, the prior manifest listed %d", t, n, listed[[t]]))
+    }
+  }
+  out
+}
+
+# The table is rebuilt from CRAN every run, so a new column needs no ALTER.
+# version and flags come last so positional readers of the older six columns
+# keep working.
+create_check_results_table <- function(con) {
+  DBI::dbExecute(con, "DROP TABLE IF EXISTS cran_check_results")
+  DBI::dbExecute(con, "
+  CREATE TABLE cran_check_results (
+    package  TEXT NOT NULL,
+    flavor   TEXT NOT NULL,
+    status   TEXT NOT NULL,
+    tinstall REAL,
+    tcheck   REAL,
+    ttotal   REAL,
+    version  TEXT,
+    flags    TEXT,
+    PRIMARY KEY (package, flavor)
+  )")
+  DBI::dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)")
+  invisible(TRUE)
+}
+
+# tools::CRAN_check_results() as cran_check_results stores it. version is the
+# release CRAN checked on that flavor; a blank Version or Flags is NULL.
+build_check_results_df <- function(results_df) {
+  pick <- function(col, as) {
+    if (col %in% names(results_df)) as(results_df[[col]]) else as(rep(NA, nrow(results_df)))
+  }
+  blank_na <- function(x) { x[!is.na(x) & !nzchar(trimws(x))] <- NA_character_; x }
+  out <- data.frame(
+    package  = pick("Package", as.character),
+    flavor   = pick("Flavor", as.character),
+    status   = pick("Status", as.character),
+    tinstall = pick("T_install", as.numeric),
+    tcheck   = pick("T_check", as.numeric),
+    ttotal   = pick("T_total", as.numeric),
+    version  = blank_na(pick("Version", as.character)),
+    flags    = blank_na(pick("Flags", as.character)),
+    stringsAsFactors = FALSE)
+  out <- out[!is.na(out$package) & !is.na(out$flavor) & !is.na(out$status), , drop = FALSE]
+  rownames(out) <- NULL
+  sanitize_df(out)
+}
+
+# JSON escape for the hand-built check_status_history details.
+json_escape <- function(s) {
+  s <- gsub("\\\\", "\\\\\\\\", s)
+  s <- gsub('"', '\\\\"', s)
+  s <- gsub("\n", "\\\\n", s)
+  s <- gsub("\t", "\\\\t", s)
+  s <- gsub("\r", "\\\\r", s)
+  s <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "", s, perl = TRUE)
+  s
+}
+
+# One non-OK entry of check_status_history.details. version names the release
+# that failed on that flavor; a missing value is "".
+check_detail_entry <- function(flavor, status, check_name, output, version = NULL, flags = NULL) {
+  s <- function(x) if (length(x) == 0 || is.na(x[1])) "" else json_escape(as.character(x[1]))
+  sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s","version":"%s","flags":"%s"}',
+          s(flavor), s(status), s(check_name), s(output), s(version), s(flags))
+}
+
+# Decide whether today's Bounce column is fit to diff. A missing column or
+# fewer than 99% of rows reading "yes" or "no" is a changed or broken source;
+# with 20 or more open episodes, an empty or halved flagged set is too.
+bounce_snapshot_healthy <- function(snapshot_n, prior_open_n, has_col, valid_share,
+                                    drop_frac_max = 0.5, min_prior = 20L,
+                                    min_valid_share = 0.99) {
+  if (!isTRUE(has_col)) return(FALSE)
+  if (is.na(valid_share) || valid_share < min_valid_share) return(FALSE)
+  if (prior_open_n < min_prior) return(TRUE)
+  if (snapshot_n == 0L) return(FALSE)
+  if ((prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
+  TRUE
+}
+
+# Diff today's flagged packages against the open bounce episodes. Flagged and
+# open extends last_seen; flagged and not open opens max+1; open and no longer
+# flagged closes as 'cleared' when the package is still on CRAN, else
+# 'vanished', leaving last_seen where it was.
+compute_bounce_changes <- function(prior_open, flagged, current_packages, max_seq_map,
+                                   version_map, today, onset_known) {
+  flagged <- unique(flagged)
+  new_pkgs <- setdiff(flagged, prior_open$package)
+  n_new <- length(new_pkgs)
+  seq_next <- ifelse(is.na(max_seq_map[new_pkgs]), 1L, as.integer(max_seq_map[new_pkgs]) + 1L)
+  inserts <- data.frame(
+    package = new_pkgs, episode_seq = as.integer(seq_next),
+    version = unname(as.character(version_map[new_pkgs])),
+    onset_known = rep(as.integer(onset_known), n_new),
+    first_seen = rep(today, n_new), last_seen = rep(today, n_new),
+    resolved_on = rep(NA_character_, n_new), outcome = rep(NA_character_, n_new),
+    archived_on = rep(NA_character_, n_new), stringsAsFactors = FALSE)
+  still <- prior_open$package %in% flagged
+  kept <- prior_open[still, , drop = FALSE]
+  gone <- prior_open[!still, , drop = FALSE]
+  updates <- rbind(
+    data.frame(last_seen = rep(today, nrow(kept)), resolved_on = rep(NA_character_, nrow(kept)),
+               outcome = rep(NA_character_, nrow(kept)), package = kept$package,
+               episode_seq = as.integer(kept$episode_seq), stringsAsFactors = FALSE),
+    data.frame(last_seen = gone$last_seen, resolved_on = rep(today, nrow(gone)),
+               outcome = ifelse(gone$package %in% current_packages, "cleared", "vanished"),
+               package = gone$package, episode_seq = as.integer(gone$episode_seq),
+               stringsAsFactors = FALSE))
+  list(inserts = inserts, updates = updates)
+}
+
+# Sole author of cran_maintainer_bounces. Onsets opened by the run that creates
+# the table are unknown (onset_known = 0); an unhealthy first snapshot creates
+# nothing, so the next healthy run still records them as unknown.
+write_bounces <- function(con, pdb, today = as.character(Sys.Date())) {
+  existed <- DBI::dbExistsTable(con, "cran_maintainer_bounces")
+  if (existed) {
+    prior_open <- DBI::dbGetQuery(con, "SELECT package, episode_seq, last_seen
+      FROM cran_maintainer_bounces WHERE resolved_on IS NULL")
+    ms <- DBI::dbGetQuery(con, "SELECT package, MAX(episode_seq) AS max_seq
+      FROM cran_maintainer_bounces GROUP BY package")
+  } else {
+    prior_open <- data.frame(package = character(0), episode_seq = integer(0),
+                             last_seen = character(0), stringsAsFactors = FALSE)
+    ms <- data.frame(package = character(0), max_seq = integer(0), stringsAsFactors = FALSE)
+  }
+  has_col <- is.data.frame(pdb) && all(c("Package", "Bounce") %in% names(pdb))
+  if (has_col) {
+    pdb <- pdb[!is.na(pdb$Package) & !duplicated(pdb$Package), , drop = FALSE]
+    b <- tolower(trimws(as.character(pdb$Bounce)))
+    valid_share <- if (nrow(pdb) > 0) mean(!is.na(b) & b %in% c("yes", "no")) else NA_real_
+    flagged <- pdb$Package[!is.na(b) & b == "yes"]
+  } else {
+    valid_share <- NA_real_
+    flagged <- character(0)
+  }
+  if (!bounce_snapshot_healthy(length(flagged), nrow(prior_open), has_col, valid_share)) {
+    return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
+  }
+
+  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_maintainer_bounces (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL,
+    version TEXT,
+    onset_known INTEGER NOT NULL,
+    first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT,
+    archived_on TEXT,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_maintainer_bounces_open
+    ON cran_maintainer_bounces(package) WHERE resolved_on IS NULL")
+
+  max_seq_map <- if (nrow(ms)) setNames(ms$max_seq, ms$package) else setNames(integer(0), character(0))
+  version_map <- setNames(as.character(pdb$Version), pdb$Package)
+  ch <- compute_bounce_changes(prior_open, flagged, pdb$Package, max_seq_map, version_map,
+                               today, onset_known = if (existed) 1L else 0L)
+
+  DBI::dbBegin(con)
+  ok <- FALSE
+  on.exit(if (!ok) tryCatch(DBI::dbRollback(con), error = function(e) NULL), add = TRUE)
+  if (nrow(ch$inserts) > 0) DBI::dbWriteTable(con, "cran_maintainer_bounces", ch$inserts, append = TRUE)
+  if (nrow(ch$updates) > 0) {
+    DBI::dbExecute(con, "UPDATE cran_maintainer_bounces SET last_seen = ?, resolved_on = ?,
+      outcome = ? WHERE package = ? AND episode_seq = ?",
+      params = list(ch$updates$last_seen, ch$updates$resolved_on, ch$updates$outcome,
+                    ch$updates$package, ch$updates$episode_seq))
+  }
+  DBI::dbCommit(con); ok <- TRUE
+  list(skipped = FALSE, new = nrow(ch$inserts), extended = sum(is.na(ch$updates$outcome)),
+       closed = sum(!is.na(ch$updates$outcome)))
 }

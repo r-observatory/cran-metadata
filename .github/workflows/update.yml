@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      start_fresh:
+        description: "Discard a prior metadata.db that fails validation and start over (its carried history is lost)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -36,6 +41,7 @@ jobs:
             any::jsonlite
             any::testthat
             any::withr
+            any::yaml
 
       - name: Run unit tests
         run: Rscript tests/testthat.R
@@ -45,44 +51,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # List releases so a transient API error fails the job (set -e on the
-          # plain assignment) instead of being mistaken for "no releases" and
-          # silently cold-starting, which would re-baseline cran_check_deadlines
-          # first_seen/episode_seq. Empty output means a genuine first-run bootstrap.
-          releases="$(gh release list --limit 1)"
+          # gh runs only in plain assignments or bare commands, so an API error
+          # fails the job instead of reading as no release or no manifest.
+          releases="$(gh release list --limit 1 --exclude-drafts)"
           if [ -n "$releases" ]; then
-            gh release download --pattern "metadata.db"
+            # The db, its manifest and prior-tag.txt all come from this one tag.
+            tag="$(gh release view --json tagName --jq .tagName)"
+            gh release download "$tag" --pattern "metadata.db"
+            assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
+            if grep -qx "manifest.json" <<<"$assets"; then
+              gh release download "$tag" --pattern "manifest.json" --output prior-manifest.json
+            fi
+            printf '%s\n' "$tag" > prior-tag.txt
           else
-            echo "No prior release exists yet; legitimate bootstrap, starting fresh."
+            echo "No prior release exists yet; first run, starting fresh."
           fi
 
       - name: Validate downloaded database
         if: hashFiles('metadata.db') != ''
-        run: |
-          # Test if update.R can actually open and use this DB.
-          # RSQLite crashes on NUL bytes in TEXT columns. All metadata tables
-          # are rebuilt each run, so starting fresh is safe (one-time loss of
-          # check_status_history is acceptable).
-          Rscript -e '
-            library(RSQLite)
-            con <- dbConnect(SQLite(), "metadata.db")
-            tryCatch({
-              dbExecute(con, "CREATE TABLE IF NOT EXISTS check_status_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                package TEXT NOT NULL, status TEXT NOT NULL,
-                flavor_summary TEXT, details TEXT, detected_at TEXT NOT NULL)")
-              dbGetQuery(con, "SELECT COUNT(*) FROM check_status_history")
-              if (dbExistsTable(con, "cran_check_deadlines"))
-                dbGetQuery(con, "SELECT COUNT(*) FROM cran_check_deadlines")
-              cat("Database OK\n")
-            }, error = function(e) {
-              cat("Database corrupted:", conditionMessage(e), "\n")
-              dbDisconnect(con)
-              file.remove("metadata.db")
-              cat("Removed — will start fresh\n")
-            })
-            if (file.exists("metadata.db")) dbDisconnect(con)
-          '
+        env:
+          START_FRESH: ${{ inputs.start_fresh }}
+        run: Rscript scripts/validate_prior.R metadata.db prior-manifest.json
 
       - name: Run update script
         run: Rscript scripts/update.R metadata.db
