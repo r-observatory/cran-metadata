@@ -4,3 +4,5 @@ release_notes.md
 .Rhistory
 .RData
 tests/testthat/Rplots.pdf
+prior-manifest.json
+prior-tag.txt
