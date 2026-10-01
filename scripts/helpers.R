@@ -169,28 +169,25 @@ compute_deadline_changes <- function(prior_open, snapshot, current_packages,
 #' updates in one transaction. Skips the diff (preserving prior rows) when the
 #' snapshot fails the no-data floor. `worst_status_map` is the same in-memory
 #' worst-check-status vector update.R computes for check_status_history.
+#' Episodes opened by the run that creates the table get onset_known = 0, and
+#' an unhealthy first snapshot creates nothing, so that stays true.
 write_deadlines <- function(con, pdb,
                             worst_status_map = setNames(character(0), character(0)),
                             today = as.character(Sys.Date()),
                             drop_frac_max = 0.5) {
-  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
-    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
-    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
-    resolved_on TEXT, outcome TEXT, archived_on TEXT,
-    PRIMARY KEY (package, episode_seq),
-    CHECK (resolved_on IS NULL OR resolved_on <> ''),
-    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
-    CHECK (last_seen >= first_seen))")
-  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_check_deadlines_open
-    ON cran_check_deadlines(package) WHERE resolved_on IS NULL")
-  DBI::dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_ccd_open_deadline
-    ON cran_check_deadlines(deadline) WHERE resolved_on IS NULL")
-
-  prior_open <- DBI::dbGetQuery(con,
-    "SELECT package, episode_seq, deadline, last_seen
-       FROM cran_check_deadlines WHERE resolved_on IS NULL")
-  ms <- DBI::dbGetQuery(con,
-    "SELECT package, MAX(episode_seq) AS max_seq FROM cran_check_deadlines GROUP BY package")
+  existed <- DBI::dbExistsTable(con, "cran_check_deadlines")
+  if (existed) {
+    prior_open <- DBI::dbGetQuery(con,
+      "SELECT package, episode_seq, deadline, last_seen
+         FROM cran_check_deadlines WHERE resolved_on IS NULL")
+    ms <- DBI::dbGetQuery(con,
+      "SELECT package, MAX(episode_seq) AS max_seq FROM cran_check_deadlines GROUP BY package")
+  } else {
+    prior_open <- data.frame(package = character(0), episode_seq = integer(0),
+                             deadline = character(0), last_seen = character(0),
+                             stringsAsFactors = FALSE)
+    ms <- data.frame(package = character(0), max_seq = integer(0), stringsAsFactors = FALSE)
+  }
   max_seq_map <- if (nrow(ms)) setNames(ms$max_seq, ms$package) else setNames(integer(0), character(0))
 
   has_col <- is.data.frame(pdb) && "Deadline" %in% names(pdb)
@@ -216,8 +213,26 @@ write_deadlines <- function(con, pdb,
     return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
   }
 
+  DBI::dbExecute(con, "CREATE TABLE IF NOT EXISTS cran_check_deadlines (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
+    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT, archived_on TEXT, onset_known INTEGER,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  # Rows from before the column existed keep NULL: their onset was not recorded.
+  if (!"onset_known" %in% DBI::dbListFields(con, "cran_check_deadlines")) {
+    DBI::dbExecute(con, "ALTER TABLE cran_check_deadlines ADD COLUMN onset_known INTEGER")
+  }
+  DBI::dbExecute(con, "CREATE UNIQUE INDEX IF NOT EXISTS ux_cran_check_deadlines_open
+    ON cran_check_deadlines(package) WHERE resolved_on IS NULL")
+  DBI::dbExecute(con, "CREATE INDEX IF NOT EXISTS idx_ccd_open_deadline
+    ON cran_check_deadlines(deadline) WHERE resolved_on IS NULL")
+
   ch <- compute_deadline_changes(prior_open, snapshot, current_packages,
                                  worst_status_map, max_seq_map, today)
+  ch$inserts$onset_known <- rep(if (existed) 1L else 0L, nrow(ch$inserts))
 
   DBI::dbBegin(con)
   ok <- FALSE

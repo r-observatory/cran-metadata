@@ -183,3 +183,44 @@ test_that("write_deadlines dedups duplicate package rows from CRAN_package_db", 
   expect_equal(DBI::dbGetQuery(con,
     "SELECT COUNT(*) AS n FROM cran_check_deadlines WHERE package = 'pkgA'")$n, 1L)
 })
+
+test_that("the run that creates the table marks its episodes onset_known 0, later runs 1", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  write_deadlines(con, .pdb(c("pkgA", "1.0", "2099-01-15")), today = "2098-12-01")
+  write_deadlines(con, .pdb(c("pkgA", "1.0", "2099-01-15"), c("pkgB", "2.0", "2099-02-01")),
+                  today = "2098-12-02")
+  got <- DBI::dbGetQuery(con, "SELECT package, onset_known FROM cran_check_deadlines ORDER BY package")
+  expect_equal(got$onset_known, c(0L, 1L))
+})
+
+test_that("an unhealthy first snapshot creates no table, so the next run still marks 0", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  pdb_nocol <- data.frame(Package = "pkgA", Version = "1.0", stringsAsFactors = FALSE)
+  expect_true(write_deadlines(con, pdb_nocol, today = "2098-12-01")$skipped)
+  expect_false(DBI::dbExistsTable(con, "cran_check_deadlines"))
+  write_deadlines(con, .pdb(c("pkgA", "1.0", "2099-01-15")), today = "2098-12-02")
+  expect_equal(DBI::dbGetQuery(con, "SELECT onset_known FROM cran_check_deadlines")$onset_known, 0L)
+})
+
+test_that("a table from before onset_known gains the column with NULL for its old rows", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  DBI::dbExecute(con, "CREATE TABLE cran_check_deadlines (
+    package TEXT NOT NULL, episode_seq INTEGER NOT NULL, deadline TEXT NOT NULL,
+    version TEXT, worst_status TEXT, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+    resolved_on TEXT, outcome TEXT, archived_on TEXT,
+    PRIMARY KEY (package, episode_seq),
+    CHECK (resolved_on IS NULL OR resolved_on <> ''),
+    CHECK ((resolved_on IS NULL) = (outcome IS NULL)),
+    CHECK (last_seen >= first_seen))")
+  DBI::dbExecute(con, "INSERT INTO cran_check_deadlines (package, episode_seq, deadline,
+    first_seen, last_seen) VALUES ('pkgA', 1, '2099-01-15', '2098-11-01', '2098-11-30')")
+  write_deadlines(con, .pdb(c("pkgA", "1.0", "2099-01-15"), c("pkgB", "2.0", "2099-02-01")),
+                  today = "2098-12-01")
+  got <- DBI::dbGetQuery(con, "SELECT package, last_seen, onset_known FROM cran_check_deadlines
+    ORDER BY package")
+  expect_equal(got$last_seen, c("2098-12-01", "2098-12-01"))
+  expect_equal(got$onset_known, c(NA, 1L))
+})
