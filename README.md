@@ -1,6 +1,6 @@
 # CRAN Metadata
 
-Daily snapshots of CRAN package metadata: check results, check details, check issues, check status history, authors, package enrichment (URLs, bug trackers), archival reasons, and package NEWS. All data is stored in a single SQLite database (`metadata.db`) and published as a GitHub release.
+Daily snapshots of CRAN package metadata: check results, check details, check issues, check status history, check deadlines, maintainer bounces, authors, package enrichment (URLs, bug trackers), archival reasons, and package NEWS. All data is stored in a single SQLite database (`metadata.db`) and published as a GitHub release.
 
 ## Data Access
 
@@ -112,6 +112,8 @@ Rebuilt each run. CRAN check results per package and flavor.
 | `tinstall` | REAL | Install time (seconds) |
 | `tcheck` | REAL | Check time (seconds) |
 | `ttotal` | REAL | Total time (seconds) |
+| `version` | TEXT | Package version CRAN checked on this flavor. It can differ from the current CRAN version while a flavor catches up |
+| `flags` | TEXT | Options the check ran with, such as `--no-vignettes` or `--no-tests`. NULL when it ran with none |
 
 ### `cran_check_details`
 
@@ -148,8 +150,42 @@ Rebuilt each run. Known check issues per package.
 | `package` | TEXT | Package name |
 | `status` | TEXT | Worst status across all flavors |
 | `flavor_summary` | TEXT | JSON object with status counts, e.g. `{"OK":12,"NOTE":1}` |
-| `details` | TEXT | JSON array of non-OK entries with flavor, status, check_name, output |
+| `details` | TEXT | JSON array of non-OK entries with flavor, status, check_name, output, version and flags (the last two are empty strings on rows written before they were recorded) |
 | `detected_at` | TEXT | ISO 8601 timestamp when the change was detected |
+
+### `cran_check_deadlines`
+
+**Carried** from run to run. One row per episode of a CRAN "issues need fixing before" deadline (`tools::CRAN_package_db()$Deadline`).
+
+| Column | Type | Description |
+|---|---|---|
+| `package` | TEXT | Package name (PK part 1) |
+| `episode_seq` | INTEGER | 1 for the package's first deadline, +1 for each later one (PK part 2) |
+| `deadline` | TEXT | The deadline as last seen; CRAN can move it |
+| `version` | TEXT | CRAN version when the episode opened |
+| `worst_status` | TEXT | Worst check status when the episode opened |
+| `first_seen` | TEXT | First day this pipeline saw the deadline |
+| `last_seen` | TEXT | Last day it was seen |
+| `resolved_on` | TEXT | Day it was gone; NULL while open |
+| `outcome` | TEXT | NULL while open, `met` when the package stayed on CRAN, `vanished` when it left |
+| `archived_on` | TEXT | Filled downstream |
+| `onset_known` | INTEGER | 0 when the episode was open on the run that created the table, so the deadline was set on or before `first_seen`; 1 when `first_seen` is the first day it was set; NULL for episodes opened before this column existed |
+
+### `cran_maintainer_bounces`
+
+**Carried** from run to run. One row per episode of CRAN's `Bounce` flag in `packages.rds`, which says CRAN's email to the package maintainer is undeliverable. The address itself is not stored.
+
+| Column | Type | Description |
+|---|---|---|
+| `package` | TEXT | Package name (PK part 1) |
+| `episode_seq` | INTEGER | 1 for the first episode, +1 each time the flag returns (PK part 2) |
+| `version` | TEXT | CRAN version when the episode opened |
+| `onset_known` | INTEGER | 0 when the flag was already set on the run that created the table (the onset is on or before `first_seen`), 1 otherwise |
+| `first_seen` | TEXT | First day this pipeline saw the flag |
+| `last_seen` | TEXT | Last day it was seen |
+| `resolved_on` | TEXT | Day it was gone; NULL while open |
+| `outcome` | TEXT | NULL while open, `cleared` when the package stayed on CRAN, `vanished` when it left |
+| `archived_on` | TEXT | Filled downstream |
 
 ### `authors`
 
@@ -203,7 +239,21 @@ Rebuilt each run. NEWS content from the GitHub CRAN mirror.
 
 ## Update Schedule
 
-The database is updated daily at 06:00 UTC via GitHub Actions. Each run rebuilds all live tables from scratch and appends new entries to `check_status_history` when a package's worst check status changes. The latest database is always available from the most recent GitHub release.
+The database is updated daily at 06:00 UTC via GitHub Actions. Each run rebuilds the snapshot tables from scratch, appends new entries to `check_status_history` when a package's worst check status changes, and updates the episode tables. The latest database is always available from the most recent GitHub release.
+
+## Carried state
+
+`check_status_history`, `cran_check_deadlines` and `cran_maintainer_bounces` cannot be rebuilt from CRAN, so each run starts from the previous release's `metadata.db`. The run downloads that database and its `manifest.json` from one release tag and stops before touching anything when GitHub fails to list or serve either file, when the database cannot be opened and read, or when a table the manifest lists under `state_tables` is missing or has fewer rows than listed. It also refuses to publish a database whose state tables have fewer rows than the previous manifest listed.
+
+The one way past an unreadable database is a manual run with the `start_fresh` input. It discards the database only when it fails those checks. That run's release notes then carry a "Cold start" line, its manifest has `cold_start: true`, and every episode it opens has `onset_known = 0`.
+
+## Retention
+
+No dated release of this repository, and no asset of one, is deleted, except a draft or a deletion the owner approves for named tags. The owner approves one only when nothing is left that exists only in those tags: each table below is either extracted through them into the history asset (`r-observatory/data`, tag `history`, per its manifest) or marked abandoned by the owner.
+
+- Extracted into the history asset: per-flavor check status, check timings, check issues and deadline moves.
+- Carried whole by every release: `check_status_history`, `cran_check_deadlines` and `cran_maintainer_bounces`.
+- Only in the dated releases: `cran_check_details` (the day's non-OK check output), `authors` and `packages_enrichment` as CRAN edits them between package versions, `package_news`, and `removal_reasons`.
 
 ## License
 

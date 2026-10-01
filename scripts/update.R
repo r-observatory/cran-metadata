@@ -461,6 +461,28 @@ tryCatch({
 })
 
 # =========================================================================
+# 6c. CRAN maintainer bounces (CRAN's email to the maintainer bounces)
+# =========================================================================
+cat("\n=== 6c. CRAN Maintainer Bounces ===\n")
+counts$bounces_new <- 0L
+counts$bounces_extended <- 0L
+counts$bounces_closed <- 0L
+tryCatch({
+  res <- write_bounces(con, pdb, today = as.character(Sys.Date()))
+  if (isTRUE(res$skipped)) {
+    cat("  Skipped: Bounce snapshot failed the health check (prior rows preserved)\n")
+  } else {
+    counts$bounces_new <- res$new
+    counts$bounces_extended <- res$extended
+    counts$bounces_closed <- res$closed
+    cat("  Bounces: ", res$new, " new, ", res$extended, " extended, ", res$closed, " closed\n", sep = "")
+  }
+}, error = function(e) {
+  cat("  ERROR:", e$message, "\n")
+  tryCatch(dbRollback(con), error = function(e2) NULL)
+})
+
+# =========================================================================
 # 7. Archival Reasons (sample of ERROR packages, limit 50)
 # =========================================================================
 cat("\n=== 7. Archival Reasons ===\n")
@@ -663,6 +685,9 @@ notes <- paste0(
   "| cran_check_deadlines (new) | ", counts$deadlines_new, " |\n",
   "| cran_check_deadlines (extended) | ", counts$deadlines_extended, " |\n",
   "| cran_check_deadlines (closed) | ", counts$deadlines_closed, " |\n",
+  "| cran_maintainer_bounces (new) | ", counts$bounces_new, " |\n",
+  "| cran_maintainer_bounces (extended) | ", counts$bounces_extended, " |\n",
+  "| cran_maintainer_bounces (closed) | ", counts$bounces_closed, " |\n",
   "| **Database size** | ", db_size, " |\n"
 )
 
