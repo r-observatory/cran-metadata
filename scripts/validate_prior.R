@@ -1,7 +1,9 @@
 #!/usr/bin/env Rscript
-# Checks the downloaded metadata.db before update.R runs and exits 1 when it
-# cannot be read or has lost state. With START_FRESH=true a db that fails is
-# removed with its manifest, and COLD_START=true goes to $GITHUB_ENV.
+# Checks the downloaded metadata.db before update.R runs and exits 1 when the
+# prior manifest cannot be parsed or the db cannot be read or has lost state.
+# A manifest that cannot be parsed fails the check without opening the db.
+# With START_FRESH=true a failed check removes the db and its manifest instead,
+# and COLD_START=true goes to $GITHUB_ENV.
 .file_arg <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
 .script_dir <- if (length(.file_arg)) dirname(normalizePath(.file_arg[1])) else "scripts"
 source(file.path(.script_dir, "helpers.R"))

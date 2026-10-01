@@ -457,10 +457,10 @@ prior_state_listing <- function(manifest) {
   setNames(as.integer(unlist(listed)), names(listed))
 }
 
-# Opens the downloaded metadata.db read-only and reads every state table in
-# full, so a NUL byte or a damaged page shows up here and not halfway through
-# update.R. ok is FALSE on any error, a listed table missing, or fewer rows
-# than the prior manifest listed.
+# Opens the downloaded metadata.db read-only, runs PRAGMA quick_check, reads
+# every state table in full and compares its row count with the prior
+# manifest. ok is FALSE on any error, a quick_check result other than ok, a
+# listed table missing, or fewer rows than the prior manifest listed.
 validate_prior_db <- function(path, manifest = NULL) {
   problems <- character(0)
   counts <- setNames(integer(0), character(0))
@@ -490,8 +490,9 @@ validate_prior_db <- function(path, manifest = NULL) {
   list(ok = length(problems) == 0, problems = problems, counts = counts)
 }
 
-# What the validation step does with the downloaded db. start_fresh discards
-# only a db that failed validation; a readable one is always kept.
+# What the validation step does with the downloaded db. One that passed is
+# kept. One that did not pass, which includes one whose manifest could not be
+# parsed, is discarded under start_fresh and fails the step otherwise.
 prior_db_action <- function(valid, start_fresh = FALSE) {
   if (isTRUE(valid)) return("keep")
   if (isTRUE(start_fresh)) return("discard")

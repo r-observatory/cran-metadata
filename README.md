@@ -243,9 +243,9 @@ The database is updated daily at 06:00 UTC via GitHub Actions. Each run rebuilds
 
 ## Carried state
 
-`check_status_history`, `cran_check_deadlines` and `cran_maintainer_bounces` cannot be rebuilt from CRAN, so each run starts from the previous release's `metadata.db`. The run downloads that database and its `manifest.json` from one release tag and stops before touching anything when GitHub fails to list or serve either file, when the database cannot be opened and read, or when a table the manifest lists under `state_tables` is missing or has fewer rows than listed. It also refuses to publish a database whose state tables have fewer rows than the previous manifest listed.
+`check_status_history`, `cran_check_deadlines` and `cran_maintainer_bounces` cannot be rebuilt from CRAN, so each run starts from the previous release's `metadata.db`. The run downloads that database and its `manifest.json` from one release tag and stops before touching anything when GitHub fails to list or serve either file, when the manifest cannot be parsed, when the database cannot be opened and read, or when a table the manifest lists under `state_tables` is missing or has fewer rows than listed. It also refuses to publish a database whose state tables have fewer rows than the previous manifest listed.
 
-The one way past an unreadable database is a manual run with the `start_fresh` input. It discards the database only when it fails those checks. That run's release notes then carry a "Cold start" line, its manifest has `cold_start: true`, and every episode it opens has `onset_known = 0`.
+A manual run with the `start_fresh` input gets past a manifest that cannot be parsed, a database that cannot be opened and read, and a listed table that is missing or has fewer rows than listed. In each of those cases it removes the downloaded database and manifest and starts over. When the manifest cannot be parsed, the database is removed without being opened. A database that passes is kept. A run that started over has a "Cold start" line in its release notes and `cold_start: true` in its manifest, and every episode it opens has `onset_known = 0`.
 
 ## Retention
 

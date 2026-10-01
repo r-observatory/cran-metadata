@@ -60,6 +60,41 @@ test_that("start_fresh removes an unreadable db and declares a cold start", {
   expect_equal(r$env, "COLD_START=true")
 })
 
+test_that("a manifest that does not parse fails the step and the db stays on disk", {
+  dir <- withr::local_tempdir()
+  .good_db(dir)
+  writeLines("{ not json", file.path(dir, "prior-manifest.json"))
+  r <- .run_validate(dir)
+  expect_equal(r$status, 1L)
+  expect_true(any(grepl("^::error::prior manifest unreadable:", r$out)))
+  expect_true(file.exists(file.path(dir, "metadata.db")))
+  expect_true(file.exists(file.path(dir, "prior-manifest.json")))
+  expect_equal(r$env, character(0))
+})
+
+test_that("start_fresh removes a readable db when its manifest does not parse", {
+  dir <- withr::local_tempdir()
+  .good_db(dir)
+  writeLines("{ not json", file.path(dir, "prior-manifest.json"))
+  r <- .run_validate(dir, start_fresh = "true")
+  expect_equal(r$status, 0L)
+  expect_true(any(grepl("^::warning::prior manifest unreadable:", r$out)))
+  expect_false(file.exists(file.path(dir, "metadata.db")))
+  expect_false(file.exists(file.path(dir, "prior-manifest.json")))
+  expect_equal(r$env, "COLD_START=true")
+})
+
+test_that("start_fresh removes a readable db with fewer rows than the manifest lists", {
+  dir <- withr::local_tempdir()
+  .good_db(dir)
+  writeLines('{"state_tables": {"check_status_history": 5}}', file.path(dir, "prior-manifest.json"))
+  r <- .run_validate(dir, start_fresh = "true")
+  expect_equal(r$status, 0L)
+  expect_false(file.exists(file.path(dir, "metadata.db")))
+  expect_false(file.exists(file.path(dir, "prior-manifest.json")))
+  expect_equal(r$env, "COLD_START=true")
+})
+
 test_that("start_fresh keeps a db that passes", {
   dir <- withr::local_tempdir()
   .good_db(dir)

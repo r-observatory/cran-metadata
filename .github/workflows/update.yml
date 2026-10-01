@@ -55,7 +55,7 @@ jobs:
           # fails the job instead of reading as no release or no manifest.
           releases="$(gh release list --limit 1 --exclude-drafts)"
           if [ -n "$releases" ]; then
-            # One tag for the db, its manifest and the seeding check.
+            # The db, its manifest and prior-tag.txt all come from this one tag.
             tag="$(gh release view --json tagName --jq .tagName)"
             gh release download "$tag" --pattern "metadata.db"
             assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
