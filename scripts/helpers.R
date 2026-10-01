@@ -527,3 +527,65 @@ state_tables_shrunk <- function(current, prior_manifest) {
   }
   out
 }
+
+# The table is rebuilt from CRAN every run, so a new column needs no ALTER.
+# version and flags come last so positional readers of the older six columns
+# keep working.
+create_check_results_table <- function(con) {
+  DBI::dbExecute(con, "DROP TABLE IF EXISTS cran_check_results")
+  DBI::dbExecute(con, "
+  CREATE TABLE cran_check_results (
+    package  TEXT NOT NULL,
+    flavor   TEXT NOT NULL,
+    status   TEXT NOT NULL,
+    tinstall REAL,
+    tcheck   REAL,
+    ttotal   REAL,
+    version  TEXT,
+    flags    TEXT,
+    PRIMARY KEY (package, flavor)
+  )")
+  DBI::dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)")
+  invisible(TRUE)
+}
+
+# tools::CRAN_check_results() as cran_check_results stores it. version is the
+# release CRAN checked on that flavor; a blank Version or Flags is NULL.
+build_check_results_df <- function(results_df) {
+  pick <- function(col, as) {
+    if (col %in% names(results_df)) as(results_df[[col]]) else as(rep(NA, nrow(results_df)))
+  }
+  blank_na <- function(x) { x[!is.na(x) & !nzchar(trimws(x))] <- NA_character_; x }
+  out <- data.frame(
+    package  = pick("Package", as.character),
+    flavor   = pick("Flavor", as.character),
+    status   = pick("Status", as.character),
+    tinstall = pick("T_install", as.numeric),
+    tcheck   = pick("T_check", as.numeric),
+    ttotal   = pick("T_total", as.numeric),
+    version  = blank_na(pick("Version", as.character)),
+    flags    = blank_na(pick("Flags", as.character)),
+    stringsAsFactors = FALSE)
+  out <- out[!is.na(out$package) & !is.na(out$flavor) & !is.na(out$status), , drop = FALSE]
+  rownames(out) <- NULL
+  sanitize_df(out)
+}
+
+# JSON escape for the hand-built check_status_history details.
+json_escape <- function(s) {
+  s <- gsub("\\\\", "\\\\\\\\", s)
+  s <- gsub('"', '\\\\"', s)
+  s <- gsub("\n", "\\\\n", s)
+  s <- gsub("\t", "\\\\t", s)
+  s <- gsub("\r", "\\\\r", s)
+  s <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "", s, perl = TRUE)
+  s
+}
+
+# One non-OK entry of check_status_history.details. version names the release
+# that failed on that flavor; a missing value is "".
+check_detail_entry <- function(flavor, status, check_name, output, version = NULL, flags = NULL) {
+  s <- function(x) if (length(x) == 0 || is.na(x[1])) "" else json_escape(as.character(x[1]))
+  sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s","version":"%s","flags":"%s"}',
+          s(flavor), s(status), s(check_name), s(output), s(version), s(flags))
+}

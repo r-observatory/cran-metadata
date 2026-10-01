@@ -94,19 +94,6 @@ extract_check_signal_vec <- function(outputs, max_chars = 2000L) {
 }
 
 # ---------------------------------------------------------------------------
-# JSON escape helper
-# ---------------------------------------------------------------------------
-json_escape <- function(s) {
-  s <- gsub("\\\\", "\\\\\\\\", s)
-  s <- gsub('"', '\\\\"', s)
-  s <- gsub("\n", "\\\\n", s)
-  s <- gsub("\t", "\\\\t", s)
-  s <- gsub("\r", "\\\\r", s)
-  s <- gsub("[\\x{00}-\\x{08}\\x{0b}\\x{0c}\\x{0e}-\\x{1f}]", "", s, perl = TRUE)
-  s
-}
-
-# ---------------------------------------------------------------------------
 # Create append-only table (never dropped)
 # ---------------------------------------------------------------------------
 invisible(dbExecute(con, "
@@ -149,32 +136,10 @@ tryCatch({
   results_df <- tools::CRAN_check_results()
   cat("  Fetched", nrow(results_df), "rows\n")
 
-  invisible(dbExecute(con, "DROP TABLE IF EXISTS cran_check_results"))
-  invisible(dbExecute(con, "
-  CREATE TABLE cran_check_results (
-    package  TEXT NOT NULL,
-    flavor   TEXT NOT NULL,
-    status   TEXT NOT NULL,
-    tinstall REAL,
-    tcheck   REAL,
-    ttotal   REAL,
-    PRIMARY KEY (package, flavor)
-  )"))
-  invisible(dbExecute(con, "CREATE INDEX idx_ccr_status ON cran_check_results (status)"))
-
-  write_df <- data.frame(
-    package  = results_df$Package,
-    flavor   = results_df$Flavor,
-    status   = results_df$Status,
-    tinstall = as.numeric(results_df$T_install),
-    tcheck   = as.numeric(results_df$T_check),
-    ttotal   = as.numeric(results_df$T_total),
-    stringsAsFactors = FALSE
-  )
-  write_df <- write_df[!is.na(write_df$package) & !is.na(write_df$flavor) & !is.na(write_df$status), ]
+  create_check_results_table(con)
+  write_df <- build_check_results_df(results_df)
   cat("  After filtering NAs:", nrow(write_df), "rows\n")
 
-  write_df <- sanitize_df(write_df)
   dbBegin(con)
   dbWriteTable(con, "cran_check_results", write_df, append = TRUE)
   dbCommit(con)
@@ -306,9 +271,7 @@ tryCatch({
           }
         }
         if (is.na(out)) out <- ""
-        sprintf('{"flavor":"%s","status":"%s","check_name":"%s","output":"%s"}',
-                json_escape(flav), json_escape(stat),
-                json_escape(chk), json_escape(out))
+        check_detail_entry(flav, stat, chk, out, non_ok$Version[j], non_ok$Flags[j])
       }, character(1))
       details_json[i] <- paste0("[", paste(entries, collapse = ","), "]")
     }

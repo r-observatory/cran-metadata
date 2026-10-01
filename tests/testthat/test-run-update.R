@@ -51,3 +51,16 @@ test_that("a second run carries state and is not a cold start", {
   expect_false(m$cold_start)
   expect_equal(m$state_tables$check_status_history, 3L)
 })
+
+test_that("a run stores the checked version and flags and names them in the details", {
+  dir <- withr::local_tempdir()
+  expect_equal(.run_update(dir, .cran_fixture(check_version = c(pkgA = "1.0", pkgB = "1.9")))$status, 0L)
+  got <- .db_query(dir, "SELECT package, version, flags FROM cran_check_results ORDER BY package")
+  expect_equal(got$version, c("1.0", "1.9"))
+  expect_equal(got$flags, c(NA, "--no-vignettes"))
+  details <- .db_query(dir, "SELECT details FROM check_status_history WHERE package = 'pkgB'")$details
+  entry <- jsonlite::fromJSON(details)
+  expect_equal(entry$version, "1.9")
+  expect_equal(entry$flags, "--no-vignettes")
+  expect_equal(entry$check_name, "tests")
+})
