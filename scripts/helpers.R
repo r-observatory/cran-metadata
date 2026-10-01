@@ -482,3 +482,33 @@ prior_db_action <- function(valid, start_fresh = FALSE) {
   if (isTRUE(start_fresh)) return("discard")
   "fail"
 }
+
+# How update.R starts. No db on disk is a cold start; when a prior release
+# exists that is only allowed after the validation step discarded it.
+startup_state <- function(db_exists, prior_release_exists, declared_cold) {
+  if (isTRUE(db_exists)) return(list(cold_start = FALSE, error = NULL))
+  if (isTRUE(prior_release_exists) && !isTRUE(declared_cold)) {
+    return(list(cold_start = TRUE,
+                error = "a prior release exists but no metadata.db was downloaded"))
+  }
+  list(cold_start = TRUE, error = NULL)
+}
+
+# The state tables among a manifest's table counts, as a JSON object.
+state_table_counts <- function(tables) {
+  keep <- intersect(STATE_TABLES, names(tables))
+  setNames(lapply(keep, function(t) as.integer(tables[[t]])), keep)
+}
+
+# One line per state table with fewer rows than the prior manifest listed.
+state_tables_shrunk <- function(current, prior_manifest) {
+  listed <- prior_state_listing(prior_manifest)
+  out <- character(0)
+  for (t in names(listed)) {
+    n <- if (t %in% names(current)) as.integer(current[[t]]) else 0L
+    if (n < listed[[t]]) {
+      out <- c(out, sprintf("%s has %d rows, the prior manifest listed %d", t, n, listed[[t]]))
+    }
+  }
+  out
+}

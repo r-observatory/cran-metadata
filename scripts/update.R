@@ -23,6 +23,17 @@ db_path <- if (length(args) >= 1) args[1] else "metadata.db"
 
 cat("Database path:", db_path, "\n")
 
+# A prior release with no db on disk is a failed download unless the validation
+# step discarded the db on a start_fresh dispatch (COLD_START=true).
+startup <- startup_state(file.exists(db_path),
+                         file.exists(file.path(dirname(db_path), "prior-tag.txt")),
+                         identical(Sys.getenv("COLD_START"), "true"))
+if (!is.null(startup$error)) stop(startup$error)
+cold_start <- startup$cold_start
+prior_manifest <- if (cold_start) NULL else
+  read_prior_manifest(file.path(dirname(db_path), "prior-manifest.json"))
+if (cold_start) cat("Cold start: no prior metadata.db carried into this run\n")
+
 # ---------------------------------------------------------------------------
 # Connect and configure SQLite
 # ---------------------------------------------------------------------------
@@ -673,6 +684,8 @@ history_total <- tryCatch(
 notes <- paste0(
   "## CRAN Metadata Update\n\n",
   "**", format(Sys.time(), "%Y-%m-%d %H:%M UTC", tz = "UTC"), "**\n\n",
+  if (cold_start) paste0("**Cold start:** no prior metadata.db was carried into this run, ",
+                         "so every episode opened today has an unknown onset.\n\n") else "",
   "| Table | Rows |\n",
   "|-------|------|\n",
   "| cran_check_results | ", counts$check_results, " |\n",
@@ -710,6 +723,13 @@ finalize_db()
 # tracks full-not-partial; freshness is tracked separately via the manifest
 # generated_at timestamp and the db_sha256 fingerprint.
 core <- summary_integrity_core(db_path, complete = FALSE)
+core$state_tables <- state_table_counts(core$tables)
+core$cold_start <- cold_start
+shrunk <- if (cold_start) character(0) else state_tables_shrunk(core$state_tables, prior_manifest)
+if (length(shrunk) > 0) {
+  for (line in shrunk) cat("::error::", line, "\n", sep = "")
+  stop("state tables lost rows since the prior release; not publishing")
+}
 manifest_path <- file.path(dirname(db_path), MANIFEST_FILENAME)
 write_manifest(manifest_path, core)
 cat("Wrote", manifest_path, "\n")
