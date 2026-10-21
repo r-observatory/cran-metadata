@@ -105,8 +105,15 @@ write_manifest <- function(path, core,
 #' dropping (even to 0) is ordinary churn, not a broken fetch, so the diff
 #' proceeds.
 deadline_snapshot_healthy <- function(snapshot_n, prior_open_n, has_col,
-                                      drop_frac_max = 0.5, min_prior = 20L) {
+                                      drop_frac_max = 0.5, min_prior = 20L,
+                                      prior_gone_n = 0L, gone_frac_max = 0.8) {
   if (!isTRUE(has_col)) return(FALSE)
+  # prior_open_n counts open episodes of packages still listed. Those of packages no longer
+  # listed (prior_gone_n) left the deadline list because CRAN archived them, so they are kept
+  # out of the drop, unless nearly all are gone at once, which reads as a broken package list.
+  prior_all_n <- prior_open_n + prior_gone_n
+  if (prior_all_n < min_prior) return(TRUE)
+  if (prior_gone_n / prior_all_n > gone_frac_max) return(FALSE)
   if (prior_open_n < min_prior) return(TRUE)
   if (snapshot_n == 0L) return(FALSE)
   if ((prior_open_n - snapshot_n) / prior_open_n > drop_frac_max) return(FALSE)
@@ -209,7 +216,9 @@ write_deadlines <- function(con, pdb,
 
   current_packages <- if (is.data.frame(pdb) && "Package" %in% names(pdb)) pdb$Package else character(0)
 
-  if (!deadline_snapshot_healthy(nrow(snapshot), nrow(prior_open), has_col, drop_frac_max)) {
+  listed <- prior_open$package %in% current_packages
+  if (!deadline_snapshot_healthy(nrow(snapshot), sum(listed), has_col, drop_frac_max,
+                                 prior_gone_n = sum(!listed))) {
     return(list(skipped = TRUE, new = 0L, extended = 0L, closed = 0L))
   }
 
