@@ -110,6 +110,17 @@ test_that("small prior sets are not skipped: churn to zero is healthy below min_
   expect_false(deadline_snapshot_healthy(0L, 20L, has_col = TRUE))  # at min_prior, empty snapshot -> skip
 })
 
+test_that("open episodes of packages no longer listed do not count toward the drop", {
+  # 100 open, 60 of them archived since: the 40 still listed keep their deadlines.
+  expect_true(deadline_snapshot_healthy(40L, 40L, has_col = TRUE, prior_gone_n = 60L))
+  # Among the packages still listed, a big drop still skips.
+  expect_false(deadline_snapshot_healthy(10L, 40L, has_col = TRUE, prior_gone_n = 60L))
+  # Nearly every open package gone at once reads as a broken package list.
+  expect_false(deadline_snapshot_healthy(5L, 5L, has_col = TRUE, prior_gone_n = 95L))
+  # Few listed packages left with deadlines is normal churn.
+  expect_true(deadline_snapshot_healthy(0L, 10L, has_col = TRUE, prior_gone_n = 30L))
+})
+
 .pdb <- function(...) {   # minimal CRAN_package_db-shaped frame
   rows <- list(...)
   if (length(rows) == 0) return(data.frame(Package=character(0), Version=character(0),
@@ -157,6 +168,27 @@ test_that("write_deadlines skips the diff on a no-data snapshot and preserves pr
   r <- write_deadlines(con, pdb_nocol, today = "2098-12-02")
   expect_true(r$skipped)
   expect_equal(nrow(.open_rows(con)), 2L)   # both still open, unmutated
+})
+
+test_that("write_deadlines carries on through a mass archival of packages with deadlines", {
+  db <- withr::local_tempfile(fileext = ".db")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db); on.exit(DBI::dbDisconnect(con))
+  pk <- sprintf("pkg%02d", 1:40)
+  rows <- lapply(pk, function(p) c(p, "1.0", "2099-01-15"))
+  write_deadlines(con, do.call(.pdb, rows), today = "2098-12-01")
+  expect_equal(nrow(.open_rows(con)), 40L)
+  # A package list holding none of the open packages is not trusted.
+  pdb_other <- .pdb(c("zzz", "1.0", "2099-01-15"))
+  expect_true(write_deadlines(con, pdb_other, today = "2098-12-02")$skipped)
+  expect_equal(nrow(.open_rows(con)), 40L)
+  # CRAN archives 30 of them: they leave the package list, the other 10 keep their deadlines.
+  r <- write_deadlines(con, do.call(.pdb, rows[31:40]), today = "2098-12-03")
+  expect_false(r$skipped)
+  expect_equal(r$closed, 30L)
+  expect_equal(r$extended, 10L)
+  got <- DBI::dbGetQuery(con, "SELECT outcome, COUNT(*) AS n FROM cran_check_deadlines
+    WHERE resolved_on IS NOT NULL GROUP BY outcome")
+  expect_equal(got$outcome, "vanished"); expect_equal(got$n, 30L)
 })
 
 test_that("the open-episode unique index rejects a second open episode per package", {
